@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 1e74937a2eaeb6b459ca5baf1dddf20e
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - m_ViewDataDictionary: {instanceID: 0}
+  - m_UXMLTree: {fileID: 9197481963319205126, guid: 30217110e8451b145aea6c355d43050e,
+      type: 3}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

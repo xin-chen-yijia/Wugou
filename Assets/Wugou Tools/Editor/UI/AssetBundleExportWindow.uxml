@@ -1,0 +1,18 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <ui:GroupBox name="ExportGroup" text="Folders Be Export&#10;" style="width: 100%; position: relative; left: auto; top: auto; display: flex;">
+        <ui:ScrollView name="ExportScrollView" />
+        <ui:GroupBox name="OutputGroup" style="flex-direction: row; margin-left: 0; margin-right: 0; margin-top: 0; margin-bottom: 0;">
+            <ui:TextField picking-mode="Ignore" label="Output:" value="&lt;path to export&gt;" name="ExportPath" usage-hints="DynamicColor" style="width: 750px; justify-content: flex-start; align-items: stretch; height: 20px; -unity-text-align: middle-left; margin-left: 0; margin-right: 0; margin-top: 0; margin-bottom: 0;" />
+            <ui:Button text="Browser..." display-tooltip-when-elided="true" name="BrowserBtn" style="flex-grow: 0; width: 73px; right: auto; position: relative; flex-direction: row;" />
+        </ui:GroupBox>
+        <ui:TextField picking-mode="Ignore" label="Plugins:" value="&lt;Plugins Names&gt;" name="PluginsInput" style="margin-right: 10px;" />
+        <ui:DropdownField label="Build Options" index="-1" choices="System.Collections.Generic.List`1[System.String]" name="BuildOptions" style="margin-right: 10px;" />
+        <ui:DropdownField label="Build Target" index="-1" choices="System.Collections.Generic.List`1[System.String]" name="BuildTarget" style="margin-right: 10px;" />
+        <ui:Toggle label="VR" name="VRToggle" />
+    </ui:GroupBox>
+    <ui:GroupBox name="OptButtons" tabindex="1" style="flex-direction: row; justify-content: space-around; align-items: center; position: absolute; width: 100%; left: -1px; overflow: visible; display: flex; top: 654px; bottom: 46px;">
+        <ui:Button text="Reset AssetBundle Name" display-tooltip-when-elided="true" name="ResetBtn" style="width: 200px; height: 30px;" />
+        <ui:Button text="Clear Old Output" display-tooltip-when-elided="true" name="ClearOldBtn" style="width: 200px; height: 30px;" />
+        <ui:Button text="Build AssetBundle" display-tooltip-when-elided="true" name="BuildBtn" style="width: 200px; height: 30px;" />
+    </ui:GroupBox>
+</ui:UXML>

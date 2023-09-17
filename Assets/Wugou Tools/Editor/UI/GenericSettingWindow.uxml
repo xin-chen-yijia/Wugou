@@ -1,0 +1,10 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <ui:GroupBox name="TagGroup" text="Tags" style="height: auto; margin-bottom: 20px;">
+        <ui:ListView focusable="true" name="TagView" style="margin-left: 15px; height: auto;" />
+        <ui:Button text="Import tag" display-tooltip-when-elided="true" name="TagImportButton" style="margin-top: 10px;" />
+    </ui:GroupBox>
+    <ui:GroupBox name="LayerGroup" text="Layers">
+        <ui:ListView focusable="true" name="LayerView" style="margin-left: 15px;" />
+        <ui:Button text="Import layer" display-tooltip-when-elided="true" name="LayerImportButton" style="margin-top: 10px;" />
+    </ui:GroupBox>
+</ui:UXML>
