@@ -6,11 +6,12 @@ using Wugou.UI;
 using Wugou;
 
 using Logger = Wugou.Logger;
+using System;
+using System.Reflection;
 
 public class InspectorPage : UIBaseWindow
 {
     public GameObject target { get; private set; }
-
 
     //// Start is called before the first frame update
     //void Start()
@@ -34,11 +35,28 @@ public class InspectorPage : UIBaseWindow
         {
             target = obj;
 
-            // 
-            foreach(var v in GetComponentsInChildren<GameComponentView>())
+            // hide all
+            foreach(var v in GetComponentsInChildren<GameComponentView>(true))
             {
-                v.target = obj;
+                v.Hide();
+            }
+
+            if(target != null)
+            {
+                GetComponentInChildren<GameEntityCommonView>(true).target = target;
+                GetComponentInChildren<GameEntityTransformView>(true).target = target;
+                foreach (var comp in target.GetComponentsInChildren<GameComponent>())
+                {
+                    var view = PropertyViewManager.instance.GetViewOfComponent(comp.GetType());
+                    if(view)
+                    {
+                        view.target = obj;
+                    }
+                }
             }
         }
+
     }
+
+
 }

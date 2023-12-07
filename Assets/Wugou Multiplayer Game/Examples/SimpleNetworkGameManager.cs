@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Wugou.Multiplayer;
 using Wugou.UI;
+using Wugou.Examples.UI;
 
 namespace Wugou.Examples
 {
@@ -13,6 +14,14 @@ namespace Wugou.Examples
     {
         kTeacher = 0,
         kStudent
+    }
+
+    /// <summary>
+    /// 游戏记录
+    /// </summary>
+    public class SimpleGameStats : GameStats
+    {
+        public Dictionary<string, SimpleGameSnapshot> playerStats = new Dictionary<string, SimpleGameSnapshot>();
     }
 
     /// <summary>
@@ -36,7 +45,7 @@ namespace Wugou.Examples
                 {"教师",0 },
                 {"学生",1 },
             };
-            uiRootWindow.GetChildWindow<InRoomPage>().SetRoleOptions(roleDropdownOptions);
+            uiRootWindow.GetChildWindow<SimpleInRoomPage>().SetRoleOptions(roleDropdownOptions);
         }
 
         // Update is called once per frame
@@ -55,25 +64,16 @@ namespace Wugou.Examples
 
         protected override void OnStartGameplay()
         {
-            var gameStats = new GameStats<SimpleGameSnapshot>();
+            var gameStats = new SimpleGameStats();
             gameStats.name = "replay_" + System.DateTime.Now.ToFileTimeUtc();
             gameStats.gamemap = gameMap.name;
             gameStats.duration = Time.realtimeSinceStartup;
             GamePlay.lastGameStats = gameStats;
         }
 
-        protected override void OnStopGameplay()
-        {
-            var gameStats = GamePlay.lastGameStats as GameStats<SimpleGameSnapshot>;
-            gameStats.duration = Time.realtimeSinceStartup - gameStats.duration;
-
-            // 写记录
-            GamePlay.gameStatsManager.AddGameStats(gameStats);
-        }
-
         public override void UpdateGameplayerSnapshot(MultiplayerGamePlayer player)
         {
-            var gameStats = GamePlay.lastGameStats as GameStats<SimpleGameSnapshot>;
+            var gameStats = GamePlay.lastGameStats as SimpleGameStats;
             gameStats.playerStats[player.name] = new SimpleGameSnapshot() { name = "Jack", score = 100 };
         }
     }

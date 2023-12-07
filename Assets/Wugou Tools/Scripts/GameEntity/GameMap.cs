@@ -18,7 +18,13 @@ namespace Wugou
     /// </summary>
     public class GameMap
     {
-        public string rawContent { get; private set; }
+        /// <summary>
+        /// 当前版本，用于比对
+        /// </summary>
+        public const int kLatestVersion = 1;
+
+
+        public string rawContent { get; private set; } = "{}";
 
         public int version;     //版本
         public string name;     //名称
@@ -113,8 +119,6 @@ namespace Wugou
     {
         private JObject jo_;
 
-        private List<AssetBundleDesc> assetbundles_ = null;
-
         public GameMapReader(string content)
         {
             jo_ = JObject.Parse(content);
@@ -141,18 +145,13 @@ namespace Wugou
 
         public AssetBundleScene ReadScene()
         {
-            if(assetbundles_ == null)
-            {
-                assetbundles_ = ReadAllAssetbundles();
-            }
-
             var tmp = jo_["gameworld"] == null ? null : jo_["gameworld"]["scene"];
             if (tmp == null)
             {
                 Logger.Warning("Game map's not have scene..");
                 return new AssetBundleScene();
             }
-            return JsonConvert.DeserializeObject<AssetBundleScene>(tmp.ToString(), new AssetBundleDescHashConvert(assetbundles_.ToDictionary(p => p.id)));
+            return JsonConvert.DeserializeObject<AssetBundleScene>(tmp.ToString(), new AssetBundleDescConvert());
         }
 
         public List<GameEntity> ReadEntities()
@@ -163,11 +162,7 @@ namespace Wugou
                 return new List<GameEntity>();
             }
 
-            if (assetbundles_ == null)
-            {
-                assetbundles_ = ReadAllAssetbundles();
-            }
-            return (tmp as JArray).ToObject<List<GameEntity>>(new JsonSerializer() { Converters = {new GameEntityConverter(), new AssetBundleDescHashConvert(assetbundles_.ToDictionary(p => p.id)), new Vector3Converter()}});
+            return (tmp as JArray).ToObject<List<GameEntity>>(JsonSerializerGlobal.commonSerializer);
         }
 
         public int ReadMaxPlayerCount()
@@ -206,12 +201,10 @@ namespace Wugou
     public class GameMapWriter
     {
         private JObject jo_;
-        private string path_;
 
-        public GameMapWriter(string path)
+        public GameMapWriter()
         {
             jo_ = new JObject();
-            path_ = path;
         }
 
         public void Write(string name, string value)
@@ -242,10 +235,10 @@ namespace Wugou
             Write("reserve", map.reserve);
         }
 
-        public void Save()
+        public void Save(string path)
         {
             // 写入文件
-            File.WriteAllText(path_, jo_.ToString());
+            File.WriteAllText(path, jo_.ToString());
         }
     }
 

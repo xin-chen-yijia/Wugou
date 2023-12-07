@@ -6,6 +6,20 @@ namespace Wugou
 {
     public static class GamePlay
     {
+        private static GamePlaySettings settings_ = null;
+        public static GamePlaySettings settings
+        {
+            get
+            {
+                if (settings_ == null)
+                {
+                    settings_ = Resources.Load<GamePlaySettings>("GamePlaySettings");
+                }
+
+                return settings_;
+            }
+        }
+
         // 登录信息
         public static Authorization.User loginInfo { get; set; }
 
@@ -13,11 +27,6 @@ namespace Wugou
         /// 游戏模式，区别于编辑模式
         /// </summary>
         public static bool isGaming { get; set; } = false;
-
-        /// <summary>
-        /// 装备所在AB包路径
-        /// </summary>
-        public static string dynamicResourcePath { get; set; }
 
         /// <summary>
         /// 最近一局的记录
@@ -33,17 +42,5 @@ namespace Wugou
         /// 加载的脚本文件名称
         /// </summary>
         public static string loadedGameMapFile { get; set; } = string.Empty;
-
-        // scene
-        public const string kMapEditorSceneName = "MapEditor";
-        public const string kMainSceneName = "Main";
-        public const string kNetworkMainSceneName = "NetworkMain";
-
-        public const string kUnistormWeatherCollectionName = "UnistormWeatherCollection";
-
-        /// <summary>
-        /// 当前应用版本，用于加载控制
-        /// </summary>
-        public const int version = 1;
     }
 }

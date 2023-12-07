@@ -5,6 +5,7 @@ using UnityEngine.SceneManagement;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine.Events;
+using System.IO;
 
 namespace Wugou
 {
@@ -51,25 +52,16 @@ namespace Wugou
                 await loader.LoadAssetBundleAsync(loader.GetAssetBundleByAssetName(GetFullSceneName(scene.sceneName)));
 
                 // ‘Ÿº”‘ÿ≥°æ∞
-                CoroutineLauncher.active.StartCoroutine(LoadingScene(scene.sceneName, model, onLoaded)); 
+                Logger.DebugInfo($"Start load scene {scene.sceneName}");
+                activeAsyncOperation = SceneManager.LoadSceneAsync(scene.sceneName, model);
+                await activeAsyncOperation;
+                Logger.DebugInfo($"load scene {scene.sceneName} complete..");
+                onLoaded?.Invoke();
+
+                activeAsyncOperation = null;
             //});
 
-        }
 
-        private static IEnumerator LoadingScene(string sceneName, LoadSceneMode model, System.Action onLoaded)
-        {
-            activeAsyncOperation = SceneManager.LoadSceneAsync(sceneName, model);
-            while (!activeAsyncOperation.isDone)
-            {
-                yield return null;
-
-            }
-
-            yield return null;
-
-            onLoaded?.Invoke();
-
-            activeAsyncOperation = null;
         }
 
         /// <summary>

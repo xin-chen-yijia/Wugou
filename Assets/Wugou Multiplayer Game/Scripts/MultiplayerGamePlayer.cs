@@ -53,10 +53,19 @@ namespace Wugou.Multiplayer
             base.OnStartClient();
 
             // 记录
-            MultiplayerGameManager.instance.ReportGamePlayer(this);
+            MultiplayerGameManager.instance.AddGamePlayer(this);
 
             // 加载模型
             visualObject = await InstantiateVisualModel();
+
+            OnInstantiateVisualModel();
+        }
+
+        public override void OnStopClient()
+        {
+            base.OnStopClient();
+
+            MultiplayerGameManager.instance.UpdateGameplayerSnapshot(this);
         }
 
         public override void OnStartLocalPlayer()
@@ -85,18 +94,42 @@ namespace Wugou.Multiplayer
         }
 
         /// <summary>
+        /// 实例化主AB包中的模型
+        /// </summary>
+        /// <param name="assetName"></param>
+        /// <param name="pos"></param>
+        /// <param name="quaternion"></param>
+        protected async void InstantiateInternal(string assetName, Vector3 pos, Quaternion quaternion, string instantiateName="")
+        {
+            var loader = await AssetBundleAssetLoader.GetOrCreate(GamePlay.settings.mainAssetbundle);
+            var assetPrefab = await loader.LoadAssetAsync<GameObject>(assetName);
+            var visualObject = Instantiate<GameObject>(assetPrefab, Vector3.zero, Quaternion.identity);
+            visualObject.transform.position = pos;
+            visualObject.transform.rotation = quaternion;
+            visualObject.name = instantiateName;
+        }
+
+        /// <summary>
         /// 实例化角色模型
         /// </summary>
         protected virtual async Task<GameObject> InstantiateVisualModel()
         {
             string visualizeAssetName = GetVisualAssetName(); 
-            var loader = await AssetBundleAssetLoader.GetOrCreate(GamePlay.dynamicResourcePath);
+            var loader = await AssetBundleAssetLoader.GetOrCreate(GamePlay.settings.mainAssetbundle);
             var soilderPrefab  = await loader.LoadAssetAsync<GameObject>(visualizeAssetName);
             var visualObject = Instantiate<GameObject>(soilderPrefab, Vector3.zero, Quaternion.identity, visualParent.transform);
             visualObject.transform.localPosition = Vector3.zero;
             visualObject.transform.localRotation = Quaternion.identity;
 
             return visualObject;
+        }
+
+        /// <summary>
+        /// 在实例化模型后调用
+        /// </summary>
+        protected virtual void OnInstantiateVisualModel()
+        {
+
         }
 
         #region Mirror RPC
@@ -248,24 +281,15 @@ namespace Wugou.Multiplayer
         }
 
         [Command]
-        public void CmdInstantiate(string assetName, Vector3 pos, Quaternion quaternion)
+        public void CmdInstantiateWithAssetName(string assetName, Vector3 pos, Quaternion quaternion, string instantiateName)
         {
-            RpcInstantiate(assetName, pos, quaternion);
+            RpcInstantiateWithName(assetName, pos, quaternion, instantiateName);
         }
 
         [ClientRpc]
-        private void RpcInstantiate(string assetName, Vector3 pos, Quaternion quaternion)
+        private void RpcInstantiateWithName(string assetName, Vector3 pos, Quaternion quaternion, string instantiateName)
         {
-            InstantiateInternal(assetName,pos,quaternion);
-        }
-
-        protected async void InstantiateInternal(string assetName, Vector3 pos, Quaternion quaternion)
-        {
-            var loader = await AssetBundleAssetLoader.GetOrCreate(GamePlay.dynamicResourcePath);
-            var soilderPrefab = await loader.LoadAssetAsync<GameObject>(assetName);
-            var visualObject = Instantiate<GameObject>(soilderPrefab, Vector3.zero, Quaternion.identity);
-            visualObject.transform.position = pos;
-            visualObject.transform.rotation = quaternion;
+            InstantiateInternal(assetName, pos, quaternion, instantiateName);
         }
 
         /// <summary>
@@ -295,6 +319,32 @@ namespace Wugou.Multiplayer
 
         }
 
+        /// <summary>
+        /// cmd
+        /// </summary>
+        /// <param name="objName"></param>
+        [Command]
+        public void CmdDestroyObject(string objName)
+        {
+            RpcDestroyObject(objName);
+        }
+
+        [ClientRpc]
+        private void RpcDestroyObject(string objName)
+        {
+            var go = GetGameObjectInternal(objName);
+            if(go != null)
+            {
+                GameObject.Destroy(go);
+            }
+        }
+
         #endregion
+
+        private void OnDestroy()
+        {
+            //
+            MultiplayerGameManager.instance.RemoveGamePlayer(this);
+        }
     }
 }

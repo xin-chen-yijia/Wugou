@@ -16,8 +16,8 @@ namespace Wugou.MapEditor
             } 
         }
 
-        protected UICollapsibleView collapsibleView_ => GetComponent<UICollapsibleView>();
-        public Transform content => collapsibleView_.content;
+        public UICollapsibleView collapsibleView => GetComponent<UICollapsibleView>();
+        public Transform content => collapsibleView.content;
         private List<PropertyView> properties_ = new List<PropertyView>();
 
         /// <summary>
@@ -28,7 +28,7 @@ namespace Wugou.MapEditor
 
         public virtual void Start()
         {
-            Debug.Assert(collapsibleView_ != null);
+            Debug.Assert(collapsibleView != null);
         }
 
         //public virtual void Update()
@@ -37,11 +37,11 @@ namespace Wugou.MapEditor
 
         protected void AddProperty(PropertyView view)
         {
-            collapsibleView_.AddContent(view.gameObject.GetComponent<RectTransform>());
+            collapsibleView.AddContent(view.gameObject.GetComponent<RectTransform>());
             properties_.Add(view);
         }
 
-        public void Resize() => collapsibleView_.Resize();
+        public void Resize() => collapsibleView.Resize();
 
         public virtual void Show()
         {
@@ -53,8 +53,8 @@ namespace Wugou.MapEditor
             gameObject.SetActive(false);
         }
 
-        public void Fold() => collapsibleView_?.Fold();
-        public void Unfold() => collapsibleView_.Unfold();
+        public void Fold() => collapsibleView?.Fold();
+        public void Unfold() => collapsibleView.Unfold();
 
         public virtual void OnNewTarget(GameObject target)
         {
@@ -63,6 +63,8 @@ namespace Wugou.MapEditor
 
     public class GameComponentView<T> : GameComponentView where T : GameComponent
     {
+        protected T targetComponent => target.GetComponent<T>();
+
         public override bool CheckTargetValid()
         {
             return target && target.GetComponent<T>() != null;

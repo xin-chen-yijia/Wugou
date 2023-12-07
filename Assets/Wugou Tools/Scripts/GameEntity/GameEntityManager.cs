@@ -3,33 +3,44 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
+using System;
 
 namespace Wugou
 {
     public static class GameEntityManager
     {
         /// <summary>
-        /// 资源路径
-        /// </summary>
-        public static string resourcePath { get; set; }
-
-        /// <summary>
         /// 记录所有的游戏实体
         /// </summary>
         public static List<GameEntity> allGameEntities { get; private set; } = new List<GameEntity>();
 
         /// <summary>
-        /// 创建一个游戏实体
+        /// 用已有的物体创建一个Entity
         /// </summary>
-        /// <param name="desc"></param>
-        /// <param name="prototype"></param>
         /// <returns></returns>
-        public static GameEntity CreateGameEntity(AssetBundleAsset desc, string prototype)
+        public static GameEntity CreateGameEntity(GameObject gameObject)
         {
-            return CreateGameEntity(new GameEntityBlueprint() { assetDesc = desc, prototype = prototype });
+            var entity = gameObject.GetComponent<GameEntity>();
+            if (!entity)
+            {
+                entity = gameObject.AddComponent<GameEntity>();
+            }
+            entity.id = AllocateEntityId();
+
+            allGameEntities.Add(entity);
+            return entity;
         }
 
-        private static int sEntityid_ = 0;
+        /// <summary>
+        /// 创建一个游戏实体
+        /// </summary>
+        /// <param name="asset"></param>
+        /// <param name="prototype"></param>
+        /// <returns></returns>
+        public static GameEntity CreateGameEntity(string asset, string prototype)
+        {
+            return CreateGameEntity(new GameEntityBlueprint() { asset = asset, prototype = prototype });
+        }
 
         /// <summary>
         /// 创建一个游戏实体
@@ -56,10 +67,46 @@ namespace Wugou
             var go = GameObject.Instantiate<GameObject>(pfb);
             var entity = go.GetComponent<GameEntity>();
             entity.blueprint = blueprint;
-            entity.id = sEntityid_++;   // 简单自增, TODO: 专门的id生成器
+            entity.id = AllocateEntityId();   
 
             allGameEntities.Add(entity);
             return entity;
+        }
+
+        /// <summary>
+        /// 分配EntityID
+        /// </summary>
+        /// <returns></returns>
+        private static int AllocateEntityId()
+        {
+            // 假设有效期50年，需要6位，月份 4位 ， 日期 5位 ， 秒 17位
+            // 这个假设应该够了。。。
+            int id = 0;
+            var date = DateTime.Now;
+            id |= ((date.Year - 2000) << 26);
+            id |= ((date.Month) << 22);
+            id |= ((date.Day) << 17);
+            id |= (date.Hour * 3600 +date.Minute * 60 +date.Second);
+
+            return id;
+        }
+
+        /// <summary>
+        /// 根据id找GameEntity
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        public static GameEntity Find(int id)
+        {
+            for(int i = 0; i < allGameEntities.Count; ++i)
+            {
+                if (allGameEntities[i].id == id)
+                {
+                    return allGameEntities[i];
+                }
+            }
+
+            return null;
         }
 
         public static void RemoveGameEntity(GameEntity entity)
@@ -68,70 +115,17 @@ namespace Wugou
             GameObject.Destroy(entity.gameObject);
         }
 
-        /// <summary>
-        /// 实例化物体
-        /// </summary>
-        /// <param name="entity"></param>
-        /// <param name="resourcePath"></param>
-        /// <returns></returns>
-        public static async Task<GameObject> InstantiateGameObject(GameEntity entity)
-        {
-            var loader = await AssetBundleAssetLoader.GetOrCreate($"{resourcePath}/{entity.blueprint.assetDesc.assetbundle.path}");
-            var goMem = await loader.LoadAssetAsync<GameObject>(entity.blueprint.assetDesc.asset);
-            var go = GameObject.Instantiate(goMem, entity.transform);   // 挂到原型物体下
-            go.transform.localPosition = Vector3.zero;
-            go.transform.localRotation = Quaternion.identity;
-
-            // 保持和entity相同tag和layer属性
-            Utils.SetLayerRecursively(go, entity.gameObject.layer);
-            go.tag = entity.gameObject.tag;
-
-            return go;
-        }
-
-        public static void SerializeEntity(GameObject go)
-        {
-            //name = go.name;
-            //position = go.transform.position;
-            //eulerAngles = go.transform.eulerAngles;
-            //localScale = go.transform.localScale;
-
-            ////
-            //components.Clear();
-            //foreach (var v in go.GetComponents<MonoBehaviour>())
-            //{
-            //    if (v is ISerialize comSerializer)
-            //    {
-            //        components.Add(v.GetType().Name, comSerializer.Serialize());
-            //    }
-            //}
-        }
-
-        ///// <summary>
-        ///// 应用保存的组件内容到指定物体，即反序列化
-        ///// </summary>
-        ///// <param name="go"></param>
-        //public void ApplyComponents(GameObject go)
-        //{
-        //    foreach (var v in go.GetComponents<MonoBehaviour>())
-        //    {
-        //        if (v is ISerialize comSerializer)
-        //        {
-        //            var compName = v.GetType().Name;
-        //            if (components.ContainsKey(compName))
-        //            {
-        //                comSerializer.Deserialize(components[compName]);
-        //            }
-        //        }
-        //    }
-        //}
-
         #region Prefab manager
         public const string DefaultTypeName = "Default";
 
-        private static Dictionary<string, GameObject> sPrefabs_ = new Dictionary<string, GameObject>();
+        private static Dictionary<string, GameObject> sPrefabs_ = new Dictionary<string, GameObject>()
+        {
+            {"Default", Resources.Load<GameObject>("GameEntityPrototypes/Default") },
+            {"StartPosition", Resources.Load<GameObject>("GameEntityPrototypes/StartPosition") }
+        };
         public static void RegisterPrefab(string type, GameObject prefab)
         {
+            Debug.Assert(!string.IsNullOrEmpty(type) && prefab);
             sPrefabs_[type] = prefab;
         }
 

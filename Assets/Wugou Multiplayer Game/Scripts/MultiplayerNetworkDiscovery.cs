@@ -26,6 +26,7 @@ namespace Wugou.Multiplayer
         // gamepaly info
         public string playerName;
         public string gameMap;
+        public int curPlayerCount;
         public int maxPlayerCount;
     }
 
@@ -53,8 +54,6 @@ namespace Wugou.Multiplayer
 
             try
             {
-                MultiplayerGameManager manager = MultiplayerGameManager.singleton as MultiplayerGameManager;
-
                 // this is an example reply message,  return your own
                 // to include whatever is relevant for your game
                 return new MultiplayerServerResponse
@@ -62,7 +61,8 @@ namespace Wugou.Multiplayer
                     serverId = ServerId,
                     uri = transport.ServerUri(),
                     playerName = GamePlay.loginInfo.name,
-                    gameMap = manager.selectedGameMap.name,
+                    gameMap = MultiplayerGameManager.instance.selectedGameMap.name,
+                    curPlayerCount = MultiplayerGameManager.instance.roomplayers.Count,
                     maxPlayerCount = MultiplayerGameManager.instance.gameMap.maxPlayerCount
                 };
             }

@@ -22,7 +22,7 @@ namespace Wugou.Examples
             {
                 if (string.IsNullOrEmpty(nameInput.text))
                 {
-                    tipsLabel.text = "请填写完整！";
+                    tipsLabel.text = "请填写用户名！";
                     tipsLabel.gameObject.SetActive(true);
                     return;
                 }
@@ -41,7 +41,7 @@ namespace Wugou.Examples
                         name = nameInput.text,
                         role = Authorization.Role.kRoleAdmin,
                     };
-                    SceneManager.LoadScene(GamePlay.kMainSceneName);
+                    SceneManager.LoadScene(GamePlay.settings.mainSceneName);
                 }
             });
         }

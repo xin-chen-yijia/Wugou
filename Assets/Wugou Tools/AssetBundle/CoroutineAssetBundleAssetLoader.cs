@@ -233,23 +233,6 @@ namespace Wugou
         /// <returns></returns>
         private AssetBundleLoadResult CheckValid()
         {
-            var puginSupports = Resources.Load<AssetBundlePluginSupports>(AssetBundlePluginSupports.fileName);
-            if (!puginSupports)
-            {
-                Logger.Error($"Resources.Load '{AssetBundlePluginSupports.fileName}' fail...");
-                error = $"Plugin's support file: {AssetBundlePluginSupports.fileName} missing.....";
-                return AssetBundleLoadResult.kPluginSupportFileNotExist;
-            }
-
-            for (int i = 0; i < assetbundleLauchDesc_.plugins.Count; ++i)
-            {
-                if (!puginSupports.plugins.Contains(assetbundleLauchDesc_.plugins[i]))
-                {
-                    error = $"{assetbundlesDir_} require '{assetbundleLauchDesc_.plugins[i]}' missing.....";
-                    return AssetBundleLoadResult.kMissingPlugin;
-                }
-            }
-
             if (vrSupport_ != assetbundleLauchDesc_.vrAssets)
             {
                 //error = $"assetbundle's vr support not same";

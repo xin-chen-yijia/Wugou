@@ -13,10 +13,10 @@ namespace Wugou
         /// <summary>
         /// 资产，用于创建可见模型
         /// </summary>
-        public AssetBundleAsset assetDesc { get; set; }
+        public string asset;
 
         /// <summary>
-        /// 原型，当前使用Unity Prefab来表示原型，即一个空的GameObject+Components表示场景中的对象，然后在该原型物体下挂模型
+        /// 原型，当前使用Unity Prefab来表示原型，即一个空的GameObject+Components表示场景中的对象
         /// </summary>
         public string prototype;
     }

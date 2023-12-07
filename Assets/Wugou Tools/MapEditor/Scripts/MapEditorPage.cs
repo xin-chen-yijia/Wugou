@@ -1,23 +1,36 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using Wugou.UI;
-using TMPro;
 using UnityEngine.UI;
-using Wugou;
-using System.IO;
-using static Wugou.MapEditor.MapEditorSystem;
 using UnityEngine.Events;
+using TMPro;
+using Wugou;
+using Wugou.UI;
 
-namespace Wugou.MapEditor
+namespace Wugou.MapEditor.UI
 {
     public class MapEditorPage : UIBaseWindow
     {
         // Start is called before the first frame update
-        //void Start()
-        //{
-
-        //}
+        void Start()
+        {
+            MapEditorSystem.instance.editorAxis.onOptionModeChanged.AddListener((mode) =>
+            {
+                //
+                switch (mode)
+                {
+                    case EditorAxis.Mode.kTranslate:
+                        transform.Find("Options/Options/Move").GetComponent<Toggle>().SetIsOnWithoutNotify(true);
+                        break;
+                    case EditorAxis.Mode.kRotate:
+                        transform.Find("Options/Options/Rotate").GetComponent<Toggle>().SetIsOnWithoutNotify(true);
+                        break;
+                    case EditorAxis.Mode.kScale:
+                        transform.Find("Options/Options/Scale").GetComponent<Toggle>().SetIsOnWithoutNotify(true);
+                        break;
+                    default:
+                        break;
+                }
+            });
+        }
 
         //// Update is called once per frame
         //void Update()

@@ -4,11 +4,11 @@ using UnityEngine;
 
 namespace Wugou.MapEditor
 {
-    public class StringPropertyView : PropertyView<string>
+    public class StringPropertyView : PropertyView
     {
-        public override string ParseFromString(string value)
+        public override void ParseFromString(string value)
         {
-            return value;
+            value_ = value;
         }
     }
 }

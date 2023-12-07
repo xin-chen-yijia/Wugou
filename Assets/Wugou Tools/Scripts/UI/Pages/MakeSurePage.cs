@@ -10,9 +10,11 @@ namespace Wugou.UI
 {
     public class MakeSurePage : UIBaseWindow
     {
-        private Button okButton_;
-        private Button cancelButton_;
-        private TMP_Text content_;
+        public Button okButton1_;
+        public Button cancelButton1_;
+        public TMP_Text content_;
+
+        public Button okButton2_;
 
         private bool initialized_ = false;
 
@@ -22,46 +24,43 @@ namespace Wugou.UI
 
         }
 
-        private void Init()
-        {
-            if (initialized_)
-            {
-                return;
-            }
-
-            initialized_ = true;
-            content_ = transform.Find("Content").GetComponent<TMP_Text>();
-            okButton_ = transform.Find("Buttons/Ok").GetComponent<Button>();
-            cancelButton_ = transform.Find("Buttons/Cancel").GetComponent<Button>();
-        }
-
         // Update is called once per frame
-        void Update()
+        //void Update()
+        //{
+
+        //}
+
+        public void ShowOptions(string content, UnityAction okAction, UnityAction cancelAction = null, string okLabel = "确定", string cancelLabel = "取消")
         {
+             content_.text = content;
 
-        }
+            okButton1_.transform.parent.gameObject.SetActive(true);
+            okButton2_.transform.parent.gameObject.SetActive(false);
 
-        public void ShowOptions(string content, UnityAction okAction, UnityAction cancelAction = null)
-        {
-            Init();
-            content_.text = content;
+            okButton1_.onClick.RemoveAllListeners();
+            okButton1_.GetComponentInChildren<TMP_Text>().text = okLabel;
+            okButton1_.onClick.AddListener(() => { okAction?.Invoke(); Hide(); });
+            okButton1_.gameObject.SetActive(true);
 
-            okButton_.onClick.AddListener(() => { okAction?.Invoke(); Hide(); });
-            okButton_.gameObject.SetActive(true);
-            cancelButton_.onClick.AddListener(() => { cancelAction?.Invoke(); Hide(); });
-            cancelButton_.gameObject.SetActive(true);
+            cancelButton1_.onClick.RemoveAllListeners();
+            cancelButton1_.GetComponentInChildren<TMP_Text>().text = cancelLabel;
+            cancelButton1_.onClick.AddListener(() => { cancelAction?.Invoke(); Hide(); });
+            cancelButton1_.gameObject.SetActive(true);
 
             Show(true);
         }
 
-        public void ShowTips(string content)
+        public void ShowTips(string content, System.Action onOk = null)
         {
-            Init();
             content_.text = content;
 
-            okButton_.onClick.AddListener(() => { Hide(); });
-            okButton_.gameObject.SetActive(true);
-            cancelButton_.gameObject.SetActive(false);
+            okButton1_.transform.parent.gameObject.SetActive(false);
+            okButton2_.transform.parent.gameObject.SetActive(true);
+
+            okButton2_.onClick.RemoveAllListeners();
+            okButton2_.GetComponentInChildren<TMP_Text>().text = "确定";
+            okButton2_.onClick.AddListener(() => { onOk?.Invoke(); Hide(); });
+            okButton2_.gameObject.SetActive(true);
 
             Show(true);
         }

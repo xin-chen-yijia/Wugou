@@ -1,25 +1,39 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using Wugou.UI;
 using UnityEngine.UI;
 using TMPro;
 using Wugou.MapEditor;
+using Wugou.UI; 
 using UnityEngine.Events;
 using System;
 
-namespace Wugou.UI {
+namespace Wugou.MapEditor.UI {
     public class WeatherPage : UIBaseWindow
     {
+        public Button okButton;
+        public Button closeButton;
+
+        public TMP_Dropdown weatherTypeDropdown;
+        public Slider timeSlider;
+        public Slider fogSlider;
+        public TMP_InputField windForceInput;
+
+
         // Start is called before the first frame update
         void Start()
         {
-            transform.Find("Main/OkButton").GetComponent<Button>().onClick.AddListener(() =>
+            okButton.onClick.AddListener(() =>
             {
                 Hide();
             });
 
-            transform.Find("Main/WeatherType/Dropdown").GetComponent<TMP_Dropdown>().onValueChanged.AddListener((int index) =>
+            closeButton.onClick.AddListener(() =>
+            {
+                Hide();
+            });
+
+            weatherTypeDropdown.onValueChanged.AddListener((int index) =>
             {
                 MapEditorSystem.instance.loadedGameMap.weather.type = index;
                 var weather = WeatherSystem.activeWeather;
@@ -28,7 +42,7 @@ namespace Wugou.UI {
                 WeatherSystem.ApplyWeather();
             });
 
-            transform.Find("Main/Time/Value").GetComponent<Slider>().onValueChanged.AddListener((float value) =>
+            timeSlider.onValueChanged.AddListener((float value) =>
             {
                 MapEditorSystem.instance.loadedGameMap.weather.time = value;
                 var weather = WeatherSystem.activeWeather;
@@ -37,7 +51,7 @@ namespace Wugou.UI {
                 WeatherSystem.ApplyWeather();
             });
 
-            transform.Find("Main/Fog/Value").GetComponent<Slider>().onValueChanged.AddListener((float value) =>
+            fogSlider.onValueChanged.AddListener((float value) =>
             {
                 MapEditorSystem.instance.loadedGameMap.weather.fogDensity = value;
                 var weather = WeatherSystem.activeWeather;
@@ -46,30 +60,32 @@ namespace Wugou.UI {
                 WeatherSystem.ApplyWeather();
             });
 
-            transform.Find("Main/WindForce/Value").GetComponent<Slider>().onValueChanged.AddListener((float value) =>
+            windForceInput.onSubmit.AddListener((string value) =>
             {
-                MapEditorSystem.instance.loadedGameMap.weather.windSpeed= value;
+                float force = MapEditorSystem.instance.loadedGameMap.weather.windSpeed;
+                float.TryParse(value, out force);
+                MapEditorSystem.instance.loadedGameMap.weather.windSpeed= force;    // 记录，用于保存
                 var weather = WeatherSystem.activeWeather;
-                weather.windSpeed = value;
+                weather.windSpeed = force;
                 WeatherSystem.activeWeather = weather;
                 WeatherSystem.ApplyWeather();
             });
 
-            transform.Find("Main/WindDir/Value").GetComponent<Slider>().onValueChanged.AddListener((float value) =>
-            {
-                MapEditorSystem.instance.loadedGameMap.weather.windDir = value;
-                var weather = WeatherSystem.activeWeather;
-                weather.windDir = value;
-                WeatherSystem.activeWeather = weather;
-                WeatherSystem.ApplyWeather();
-            });
+            //transform.Find("Main/WindDir/Value").GetComponent<Slider>().onValueChanged.AddListener((float value) =>
+            //{
+            //    MapEditorSystem.instance.loadedGameMap.weather.windDir = value;
+            //    var weather = WeatherSystem.activeWeather;
+            //    weather.windDir = value;
+            //    WeatherSystem.activeWeather = weather;
+            //    WeatherSystem.ApplyWeather();
+            //});
         }
 
         // Update is called once per frame
-        void Update()
-        {
+        //void Update()
+        //{
 
-        }
+        //}
 
         public void SetOptions(List<string> weathers)
         {
@@ -79,8 +95,7 @@ namespace Wugou.UI {
                 ops.Add(new TMP_Dropdown.OptionData(v));
             }
 
-            var dropdown = transform.Find("Main/WeatherType").GetComponentInChildren<TMP_Dropdown>();
-            dropdown.options = ops;
+            weatherTypeDropdown.options = ops;
         }
 
         private bool inited = false;
@@ -91,9 +106,11 @@ namespace Wugou.UI {
                 inited = true;
                 SetOptions(WeatherSystem.allWeatherNames);
             }
-            transform.Find("Main/Time/Value").GetComponent<Slider>().value = WeatherSystem.activeWeather.time;
-            transform.Find("Main/WeatherType/Dropdown").GetComponent<TMP_Dropdown>().SetValueWithoutNotify(MapEditorSystem.instance.loadedGameMap.weather.type);
-            transform.Find("Main/Fog/Value").GetComponent<Slider>().value = WeatherSystem.activeWeather.fogDensity;
+
+            var weather = WeatherSystem.activeWeather;
+            timeSlider.value = weather.time;
+            weatherTypeDropdown.SetValueWithoutNotify(weather.type);
+            fogSlider.value = weather.fogDensity;
 
             base.Show(asTop);
         }

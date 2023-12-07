@@ -6,6 +6,8 @@ using Wugou.UI;
 using TMPro;
 using Wugou.Multiplayer;
 using System.IO;
+using Wugou.Examples.UI;
+using Wugou.MapEditor;
 
 namespace Wugou.Examples
 {
@@ -16,24 +18,46 @@ namespace Wugou.Examples
             base.Start();
 
             // show window
-            uiRootWindow.GetChildWindow<HomePage>().Show();
+            uiRootWindow.Show();
+            uiRootWindow.GetChildWindow<SimpleHomePage>().Show();
+            uiRootWindow.GetChildWindow<SimpleGameMapListPage>().Show();
+            uiRootWindow.GetChildWindow<SimpleGameMapListPage>().Refresh();
 
             // 游戏记录管理
             GamePlay.gameStatsManager = new GameStatsManager(Path.Combine(Application.persistentDataPath, "gamestats"));
 
-            if (GamePlay.lastGameStats != null)
+            // 
+            MapEditorSystem.onSaveGameMap.AddListener((fileName, map) =>
             {
-                uiRootWindow.GetChildWindow<HomePage>().Toggle(HomePage.StatisticPageId);
-                uiRootWindow.GetChildWindow<SimpleStatisticPage>().SelectLastest();
+                GameMapManager.SaveGameMap(fileName, map);
+            });
 
-                GamePlay.lastGameStats = null;
-            }
+            StartCoroutine(DelayDo());
 
+            WeatherSystem.Load = () =>
+            {
+
+            };
             //
             WeatherSystem.ApplyWeather = () =>
             {
                 // do nothing
             };
+
+            WeatherSystem.Clear = () => { };
+        }
+
+        IEnumerator DelayDo()
+        {
+            yield return null;
+
+            if (GamePlay.lastGameStats != null)
+            {
+                uiRootWindow.GetChildWindow<SimpleHomePage>().Toggle(SimpleHomePage.StatisticPageId);
+                uiRootWindow.GetChildWindow<SimpleStatisticPage>().SelectLastest();
+
+                GamePlay.lastGameStats = null;
+            }
         }
     }
 }

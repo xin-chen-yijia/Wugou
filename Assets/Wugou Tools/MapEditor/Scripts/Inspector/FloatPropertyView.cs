@@ -4,17 +4,16 @@ using UnityEngine;
 
 namespace Wugou.MapEditor
 {
-    public class FloatPropertyView : PropertyView<float>
+    public class FloatPropertyView : PropertyView
     {
-        public override float ParseFromString(string value)
+        public override void ParseFromString(string value)
         {
             float t = 0;
             if (float.TryParse(value, out t))
             {
-                return t;
+                value_ = t;
             }
 
-            return value_;
         }
     }
 }

@@ -4,5 +4,20 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Wugou Multiplayer Game/Examples/Scene/Login.unity
+    guid: 2215a44a4880a5847826c640b2359369
+  - enabled: 1
+    path: Assets/Wugou Multiplayer Game/Examples/Scene/Main.unity
+    guid: 7e5d76e4fb34dcd43a5f032fb24f1ca4
+  - enabled: 1
+    path: Assets/Wugou Multiplayer Game/Examples/Scene/MapEditor.unity
+    guid: 6410f41250e241f4b9c17f899120ea83
+  - enabled: 1
+    path: Assets/Wugou Multiplayer Game/Examples/Scene/NetworkMain.unity
+    guid: 3e33fbaeee2de8d4a81718e3e746c4a5
+  - enabled: 1
+    path: Assets/Wugou Multiplayer Game/Examples/Scene/NetworkRoom.unity
+    guid: 38cbf35b0abd54d42a8ac892196c3389
   m_configObjects: {}

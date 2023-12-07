@@ -10,10 +10,12 @@ namespace Wugou.Examples
         public override void OnStopClient()
         {
             print("NetworkBehaviour OnStopClient ===== ");
-
-            //
-            SimpleNetworkGameManager.instance.UpdateGameplayerSnapshot(this);
         }
+
+        //public override string GetVisualAssetName()
+        //{
+        //    return "";
+        //}
     }
 
 }

@@ -1,0 +1,12 @@
+[
+    {
+        "name": "基础类型",
+        "items": [
+            {
+                "name": "StartPosition",
+                "asset": "StartPosition",
+                "type": "StartPosition"
+            }
+        ]
+    }
+]

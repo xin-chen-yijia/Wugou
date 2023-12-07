@@ -58,6 +58,9 @@ namespace Wugou
             }
         }
 
+        // 飞行时间越久，速度越快
+        private float moveMultiplier_ = 1;
+        private float accruedTime = 0.0f;   // 时间累计，每一帧都提速太快了
         // Update is called once per frame
         void Update()
         {
@@ -75,7 +78,19 @@ namespace Wugou
             float dx = Input.GetAxis("Mouse X");
             float dy = Input.GetAxis("Mouse Y");
 
-            float tSpeed = moveSpeed * Time.deltaTime;
+            if(Mathf.Abs(hx) < 0.01f && Mathf.Abs(hz) < 0.01f)
+            {
+                moveMultiplier_ = 1.0f;
+            }
+            accruedTime += Time.deltaTime;
+            if(accruedTime > 0.1f)
+            {
+                accruedTime = 0.0f;
+                moveMultiplier_ *= 1.01f;
+                moveMultiplier_ = Mathf.Clamp(moveMultiplier_, 1, 12);
+            }
+
+            float tSpeed = moveSpeed * moveMultiplier_ * Time.deltaTime;
 
             if (Input.GetKey(KeyCode.LeftShift))
             {

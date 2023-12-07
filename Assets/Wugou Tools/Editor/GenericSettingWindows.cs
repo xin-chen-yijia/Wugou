@@ -58,6 +58,7 @@ namespace Wugou.Editor
             {
                 "MapEditor",
                 "MapTool",
+                "MapGizmos",
             };
             layerView.itemsSource = layers;
 

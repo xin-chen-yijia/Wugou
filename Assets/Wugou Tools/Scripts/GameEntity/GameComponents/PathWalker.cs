@@ -5,12 +5,14 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Events;
+using System;
 
 namespace Wugou
 {
-    [CustomPropertyView("PathWalker")]
+    [CustomGameComponentView(typeof(PathWalkerView))]
     public class PathWalker : GameComponent
     {
+        [Serializable]
         public struct PathPoint
         {
             public Vector3 position;
@@ -19,6 +21,7 @@ namespace Wugou
         }
 
         //Â·¾¶µã
+        [SerializeField]
         public List<PathPoint> points { get; private set; } = new List<PathPoint>();
 
         public float speed = 10;    
@@ -41,12 +44,7 @@ namespace Wugou
         private int index_ = 0;
         public void StartWalk()
         {
-            if (points.Count == 0)
-            {
-                return;
-            }
-
-            StartCoroutine(Walk());
+            StartCoroutine(WalkCoroutine());
         }
 
         public void Pause()
@@ -82,33 +80,36 @@ namespace Wugou
             transform.eulerAngles = cachedTransform.eulerAngles;
         }
 
-        IEnumerator Walk()
+        IEnumerator WalkCoroutine()
         {
-            transform.position = points[0].position;
-            if (points.Count > 1)
+            if (points.Count > 0)
             {
-                transform.forward = (points[1].position - points[0].position).normalized;
-
-                index_ = 0;
-                isRunning = true;
-                while (index_ + 1 < points.Count)
+                transform.position = points[0].position;
+                if (points.Count > 1)
                 {
-                    if (isRunning)
-                    {
-                        transform.Translate(new Vector3(0, 0, speed * Time.deltaTime), Space.Self);
+                    transform.forward = (points[1].position - points[0].position).normalized;
 
-                        var curDir = (points[index_ + 1].position - transform.position);
-                        if (Vector3.Dot(transform.forward, curDir) < 0) // 
+                    index_ = 0;
+                    isRunning = true;
+                    while (index_ + 1 < points.Count)
+                    {
+                        if (isRunning)
                         {
-                            index_++;
-                            if (index_ + 1 < points.Count)
+                            transform.Translate(new Vector3(0, 0, speed * Time.deltaTime), Space.Self);
+
+                            var curDir = (points[index_ + 1].position - transform.position);
+                            if (Vector3.Dot(transform.forward, curDir) < 0) // 
                             {
-                                transform.forward = (points[index_ + 1].position - points[index_].position).normalized;
+                                index_++;
+                                if (index_ + 1 < points.Count)
+                                {
+                                    transform.forward = (points[index_ + 1].position - points[index_].position).normalized;
+                                }
                             }
                         }
-                    }
 
-                    yield return null;
+                        yield return null;
+                    }
                 }
             }
 

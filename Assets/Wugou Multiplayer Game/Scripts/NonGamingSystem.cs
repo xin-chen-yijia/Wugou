@@ -5,7 +5,6 @@ using Wugou.UI;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using Unity.IO.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -22,43 +21,38 @@ namespace Wugou
         // UI
         public UIRootWindow uiRootWindow;
 
+        private static bool sInited_ = false;
 
-        public virtual void Awake()
+        private static void InitOnce()
         {
-            instance = this;
+            if (sInited_)
+            {
+                return;
+            }
 
+            sInited_ = true;
             // register sceneObject's types for map editor
             var typePrefabs = Resources.LoadAll<GameObject>("SceneObjectPrototype/Gameplay");
             foreach (var v in typePrefabs)
             {
                 GameEntityManager.RegisterPrefab(v.name, v);
             }
+
+            // 读取资产
+            GameAssetDatabase.RegisterAssets($"{GamePlay.settings.configPath}/assets.json");
         }
+
+        public virtual void Awake()
+        {
+            instance = this;
+
+            InitOnce();
+        }
+
 
         // Start is called before the first frame update
         public virtual void Start()
         {
-            //
-            JObject config = JObject.Parse(File.ReadAllText($"{Application.streamingAssetsPath}/config.json"));
-            string resoureDir = config["resource"].ToString();
-            GamePlay.dynamicResourcePath = resoureDir + "/" + config["mainAssetBundle"].ToString();
-
-            // 脚本路径
-            GameMapManager.Initialize(resoureDir);
-            GameEntityManager.resourcePath = resoureDir;
-
-            string mapsDir = config["mapDir"].ToString();
-            if (mapsDir != "")
-            {
-                GameMapManager.gameMapsDir = mapsDir;
-            }
-
-            // UI
-            // show window
-            uiRootWindow.Show();
-            uiRootWindow.GetChildWindow<HomePage>().Show();
-            uiRootWindow.GetChildWindow<GameMapListPage>().Show();
-            uiRootWindow.GetChildWindow<GameMapListPage>().Refresh();
 
         }
 
@@ -74,7 +68,7 @@ namespace Wugou
         public virtual void OnApplicationQuit()
         {
             // assets
-            GameMapManager.UnloadAllAssetBundles();
+            AssetBundleAssetLoader.UnloadAllAssetBundle();
         }
 
         /// <summary>
@@ -82,7 +76,7 @@ namespace Wugou
         /// </summary>
         public void EnterLobby()
         {
-            SceneManager.LoadScene(GamePlay.kNetworkMainSceneName);
+            SceneManager.LoadScene(GamePlay.settings.networkMainSceneName);
         }
     }
 }

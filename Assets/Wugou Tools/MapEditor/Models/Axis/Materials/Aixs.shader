@@ -9,7 +9,10 @@ Shader "Wugou/Axis"
     SubShader
     {
         // No culling or depth
-        Cull Off ZWrite Off ZTest Always
+        //Cull Off 
+        ZWrite Off
+        ZTest Off
+        Tags { "Queue" = "Transparent+2000" }
 
         Pass
         {

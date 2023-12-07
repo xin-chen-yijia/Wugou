@@ -10,6 +10,9 @@ namespace Wugou
 {
     /// <summary>
     /// 继承MonoBehaviour是不想自己再实现这一套，因为之前是基于Unity的这一套做的
+    /// 关于序列化：
+    /// 1. 属性序列化需要加上SerializeField特性；
+    /// 2. public 字段加NonSerialized则不序列化；
     /// </summary>
     public class GameComponent : MonoBehaviour
     {
@@ -42,7 +45,7 @@ namespace Wugou
         /// <summary>
         /// 不用start，因为start的调用在使用instantiate时是下一帧，这对于代码逻辑有很大的影响
         /// </summary>
-        public virtual void Awake()
+        public virtual void Start()
         {
             if (GamePlay.isGaming)
             {
@@ -66,7 +69,7 @@ namespace Wugou
             }
         }
 
-        public void OnDestroy()
+        public virtual void OnDestroy()
         {
             if (GamePlay.isGaming)
             {

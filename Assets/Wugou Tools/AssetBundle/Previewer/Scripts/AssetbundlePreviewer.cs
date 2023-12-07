@@ -246,7 +246,6 @@ namespace Wugou.AssetbundlePreviewer
             }
         }
 
-        private bool isVRMode = false;
         public void EnterVR()
         {
 #if WUGOU_XR

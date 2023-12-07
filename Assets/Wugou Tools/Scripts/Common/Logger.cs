@@ -37,6 +37,13 @@ namespace Wugou
                 Debug.LogError(message);
             }
         }
+
+        public static void DebugInfo(object message)
+        {
+#if UNITY_EDITOR
+            Info($"[Debug] {message}");
+#endif
+        }
 #else
         public static void Info(object message)
         {
@@ -47,6 +54,10 @@ namespace Wugou
         }
 
         public static void Error(object message)
+        {
+        }
+
+        public static void DebugInfo(object message)
         {
         }
 #endif

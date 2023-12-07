@@ -11,11 +11,17 @@ namespace Wugou.MapEditor
     {
         public GameObject posRowPrefab;
         public GameObject posRowContainer;
+
+        public Button editorButton;
+        public Button addButton;
+
         public TMP_InputField speedInput;
 
+        private bool isEditing = false;
         private bool isPreviewing = false;
 
-        private PathWalker walker_ => target.GetComponent<PathWalker>();
+        private Vector3 cachedPosition;
+        private Quaternion cachedRotation;
 
         public override void Start()
         {
@@ -23,112 +29,160 @@ namespace Wugou.MapEditor
 
             posRowPrefab.SetActive(false);
 
+            editorButton.onClick.AddListener(() =>
+            {
+                SetEditorActive(!isEditing);
+            });
+
             speedInput.onValueChanged.AddListener((value) =>
             {
-                float t = walker_.speed;
+                float t = targetComponent.speed;
                 if(float.TryParse(value, out t) )
                 {
-                    walker_.speed = t;
+                    targetComponent.speed = t;
                 }
             });
 
             speedInput.onDeselect.AddListener((value) =>
             {
-                speedInput.text = walker_.speed.ToString();
+                speedInput.text = targetComponent.speed.ToString();
             });
 
             //
-            content.Find("Buttons/AddButton").GetComponent<Button>().onClick.AddListener(() =>
+            addButton.onClick.AddListener(() =>
             {
                 var point = new PathWalker.PathPoint
                 {
-                    position = walker_.gameObject.transform.position,
-                    eulerAngles = walker_.gameObject.transform.eulerAngles
+                    position = targetComponent.gameObject.transform.position,
+                    eulerAngles = targetComponent.gameObject.transform.eulerAngles
                 };
-                walker_.points.Add(point);
-                AddPointInternal(walker_.points.Count - 1);
+                targetComponent.points.Add(point);
+                AddPointUIInternal(targetComponent.points.Count - 1);
             });
 
-            var previewButton = content.Find("Buttons/PreviewButton").GetComponent<Button>();
-            previewButton.onClick.AddListener(() =>
-            {
-                isPreviewing = !isPreviewing;
-                if (isPreviewing)
-                {
-                    previewButton.GetComponentInChildren<TMP_Text>().text = "Õ£÷π";
-                    walker_.PushState();
-                    walker_.StartWalk();
-                }
-                else
-                {
-                    walker_.Stop();
-                    OnStopPreview();
-                }
-            });
+            //var previewButton = content.Find("Buttons/PreviewButton").GetComponent<Button>();
+            //previewButton.onClick.AddListener(() =>
+            //{
+            //    isPreviewing = !isPreviewing;
+            //    if (isPreviewing)
+            //    {
+            //        previewButton.GetComponentInChildren<TMP_Text>().text = "Õ£÷π";
+            //        targetComponent.PushState();
+            //        targetComponent.StartWalk();
+            //    }
+            //    else
+            //    {
+            //        targetComponent.Stop();
+            //        OnStopPreview();
+            //    }
+            //});
         }
 
-        private void AddPointInternal(int index)
+        void SetEditorActive(bool active)
+        {
+            isEditing = active;
+            editorButton.GetComponentInChildren<TMP_Text>().text = isEditing ? "Ω· ¯±‡º≠" : "ø™ º±‡º≠";
+
+            if (isEditing)
+            {
+                cachedPosition = target.transform.position;
+                cachedRotation = target.transform.rotation;
+            }
+            else
+            {
+                target.transform.position = cachedPosition;
+                target.transform.rotation = cachedRotation;
+            }
+
+            addButton.gameObject.SetActive(isEditing);
+
+            foreach (var v in posRowContainer.GetComponentsInChildren<Button>())
+            {
+                v.interactable = isEditing;
+                var c = v.GetComponentInChildren<TMP_Text>().color;
+                c.a = isEditing ? 1 : 0.5f;
+                v.GetComponentInChildren<TMP_Text>().color = c;
+            }
+        }
+
+        private void AddPointUIInternal(int index)
         {
             GameObject go = Instantiate<GameObject>(posRowPrefab, posRowContainer.transform);
             go.SetActive(true);
-            go.transform.Find("Toggle").GetComponent<Toggle>().onValueChanged.AddListener((isOn) =>
+            var point = targetComponent.points[index];
+            go.transform.Find("LocateButton").GetComponent<Button>().onClick.AddListener(() =>
             {
-                if (!isOn)
-                {
-                    return;
-                }
-                walker_.transform.position = walker_.points[index].position;
-                walker_.transform.eulerAngles = walker_.points[index].eulerAngles;
+                targetComponent.transform.position = point.position;
+                targetComponent.transform.eulerAngles = point.eulerAngles;
             });
             go.transform.Find("DelButton").GetComponent<Button>().onClick.AddListener(() =>
             {
-                walker_.points.RemoveAt(go.transform.GetSiblingIndex()); 
+                var n = go.transform.GetSiblingIndex();
+                targetComponent.points.RemoveAt(n); 
                 GameObject.Destroy(go);
+
+                // remove gizmo
+                GameObject.DestroyImmediate(entityGizmo.transform.GetChild(n).gameObject);
             });
 
-            var size = posRowContainer.GetComponent<RectTransform>().sizeDelta;
-            var layout = posRowContainer.GetComponent<VerticalLayoutGroup>();
-            size.y += layout.spacing + go.GetComponent<RectTransform>().sizeDelta.y;
-            posRowContainer.GetComponent<RectTransform>().sizeDelta = size;
+            go.transform.Find("Pos/X").GetComponent<TMP_Text>().text = point.position.x.ToString();
+            go.transform.Find("Pos/X").GetComponent<TMP_Text>().text = point.position.y.ToString();
+            go.transform.Find("Pos/X").GetComponent<TMP_Text>().text = point.position.z.ToString();
+
+            Utils.ResizeContainerHeight(posRowContainer);
+
+            // gizmos
+            var gizmoObj = Instantiate<GameObject>(target.transform.Find("Body").gameObject, entityGizmo.transform);
+            gizmoObj.transform.position = point.position;
+            gizmoObj.transform.eulerAngles = point.eulerAngles;
+            gizmoObj.layer = MapEditorSystem.mapGizmosLayer;
+            while (gizmoObj.GetComponentInChildren<Collider>()) // ±‹√‚±ª—°÷–
+            {
+                GameObject.DestroyImmediate(gizmoObj.GetComponentInChildren<Collider>());
+            }
+            foreach(var v in gizmoObj.GetComponentsInChildren<Renderer>())
+            {
+                v.material = Resources.Load<Material>("Materials/Gizmo50");
+            }
         }
 
         private void OnStopPreview()
         {
             content.Find("Buttons/PreviewButton").GetComponentInChildren<TMP_Text>().text = "‘§¿¿";
-            walker_.PopState();
+            targetComponent.PopState();
             isPreviewing = false;
-        }
-
-        public override void Show()
-        {
-            base.Show();
-
-            if (walker_ != null)
-            {
-                walker_.OnWalkStop.AddListener(OnStopPreview);
-            }
-
-        }
-
-        public override void Hide()
-        {
-            base.Hide();
-
-            if(target)
-            {
-                walker_.OnWalkStop.RemoveListener(OnStopPreview);
-
-                walker_.Stop();
-                //walker_.PopState();
-            }
-
         }
 
         public override void OnNewTarget(GameObject target)
         {
             if (target)
             {
-                walker_.PushState();
+                if (gizmoParent_ == null)
+                {
+                    gizmoParent_ = new GameObject("GizmoParent");
+                }
+
+                if (entityGizmo != null)
+                {
+                    entityGizmo.SetActive(false);
+                    SetEditorActive(false);
+                }
+
+                string gizmoName = target.GetComponent<GameEntity>().id.ToString();
+                var tmp = gizmoParent_.transform.Find(gizmoName);
+                if (!tmp)
+                {
+                    entityGizmo = new GameObject(gizmoName);
+                    entityGizmo.transform.SetParent(gizmoParent_.transform);
+                }
+                else
+                {
+                    entityGizmo = tmp.gameObject;
+                    entityGizmo.SetActive(true);
+                }
+
+
+                targetComponent.PushState();
 
                 // «Â¿Ì£¨ TODO: reuse
                 foreach(Transform v in posRowContainer.transform)
@@ -136,16 +190,33 @@ namespace Wugou.MapEditor
                     GameObject.Destroy(v.gameObject);
                 }
 
-                for(int i=0;i < walker_.points.Count;++i)
+                for(int i=0;i < targetComponent.points.Count;++i)
                 {
-                    AddPointInternal(i);
+                    AddPointUIInternal(i);
                 }
 
-                speedInput.text = walker_.speed.ToString();
+                speedInput.text = targetComponent.speed.ToString();
             }
 
             base.OnNewTarget(target);
 
+
+        }
+
+        private static GameObject gizmoParent_ = null;
+        public GameObject entityGizmo { get;private set; }
+
+        private void OnDisable()
+        {
+            // hide
+            if(entityGizmo != null)
+            {
+                entityGizmo.SetActive(false);
+                if(isEditing)
+                {
+                    SetEditorActive(false);
+                }
+            }
 
         }
 

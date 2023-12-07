@@ -29,6 +29,14 @@ namespace Wugou
         public static List<string> allWeatherNames { get; private set; } = new List<string>();
 
         /// <summary>
+        /// 加载天气插件物体
+        /// </summary>
+        public static System.Action Load = () =>
+        {
+            throw new System.Exception("Unimplement WeatherSystem's Load function.");
+        };
+
+        /// <summary>
         /// 应用天气，需要根据使用的天气系统来决定实现
         /// </summary>
         public static System.Action ApplyWeather = () =>

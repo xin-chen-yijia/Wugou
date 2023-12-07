@@ -15,10 +15,6 @@ namespace Wugou
 {
     public static class GameWorld
     {
-        /// <summary>
-        /// 当前版本，用于比对
-        /// </summary>
-        public const int version = 1;
 
         // 记录已放置的物体，用于后续更改或删除
         public static List<GameEntity> gameEntities { get; private set; } = new List<GameEntity>();
@@ -46,14 +42,20 @@ namespace Wugou
         /// <summary>
         /// 是否已加载完毕脚本
         /// </summary>
-        public static bool isGameMapLoaded { get; private set; } = false;
+        public static bool isLoading { get; private set; } = false;
+
+        /// <summary>
+        /// 中断加载，用于加载场景或大模型耗时过长的情况，此时Unity会阻塞，这个可能对外部外部逻辑会有影响，如网络通信
+        /// true:如果此时正在Loading，则中断这个过程
+        /// </summary>
+        public static bool interruptLoading { get; set; } = false;
 
         /// <summary>
         /// 根据名字查找脚本中的物体
         /// </summary>
         /// <param name="id"></param>
         /// <returns></returns>
-        public static GameEntity GetGameObject(int id)
+        public static GameEntity GetGameEntity(int id)
         {
             foreach(var v in gameEntities)
             {
@@ -85,6 +87,18 @@ namespace Wugou
         }
 
         /// <summary>
+        /// 向GameWorld中添加一个已存在的GameEntity
+        /// </summary>
+        /// <param name="entity"></param>
+        /// <returns></returns>
+        public static GameEntity AddGameEntity(GameEntity entity)
+        {
+            gameEntities.Add(entity);
+
+            return entity;
+        }
+
+        /// <summary>
         ///  向场景中添加新物体，同时会向加载的脚本中添加该项
         /// </summary>
         /// <param name="blueprint"></param>
@@ -101,15 +115,31 @@ namespace Wugou
         /// <summary>
         /// 向场景和脚本中同时添加物体
         /// </summary>
-        /// <param name="assetDesc"></param>
+        /// <param name="asset"></param>
         /// <param name="prototype"></param>
         /// <returns></returns>
-        public static GameEntity AddGameEntity(AssetBundleAsset assetDesc, string prototype)
+        public static GameEntity AddGameEntity(string asset, string prototype)
         {
             var bp = new GameEntityBlueprint();
-            bp.assetDesc = assetDesc;
+            bp.asset = asset;
             bp.prototype = prototype;
             return AddGameEntity(bp);
+        }
+
+        /// <summary>
+        /// 向GameWorld中添加一个已存在的物体
+        /// </summary>
+        /// <param name="gameObject"></param>
+        public static void AddGameObject(GameObject gameObject)
+        {
+            if (gameObject.GetComponent<GameEntity>())
+            {
+                AddGameEntity(gameObject.GetComponent<GameEntity>());
+            }
+            else
+            {
+                Logger.Warning($"{gameObject.name} not have GameEntity");
+            }
         }
 
         /// <summary>
@@ -126,6 +156,23 @@ namespace Wugou
             else
             {
                 Logger.Error($"GameWorld have no {gameObject.name}");
+            }
+        }
+
+        /// <summary>
+        /// 替换GameEntity,用于某些情况
+        /// </summary>
+        /// <param name="oldEntity"></param>
+        /// <param name="newEntity"></param>
+        public static void ReplaceGameEntity(GameEntity oldEntity, GameEntity newEntity)
+        {
+            for (int i=0; i < gameEntities.Count; ++i)
+            {
+                if (gameEntities[i] == oldEntity)
+                {
+                    gameEntities[i] = newEntity;
+                    break;
+                }
             }
         }
 
@@ -169,7 +216,6 @@ namespace Wugou
                 return;
             }
 
-
             GameMap map = new GameMap();
             map.Parse(mapContent);
 
@@ -195,26 +241,45 @@ namespace Wugou
 
             // read map file, use property first, because map may create with empty tempalte
             int mapVersion = map.version;
-            if (mapVersion < version)
+            if (mapVersion < GameMap.kLatestVersion)
             {
-                Logger.Error($"game map version {mapVersion} less than current supported version {version}.");
+                Logger.Error($"game map version {mapVersion} less than current supported version {GameMap.kLatestVersion}.");
                 return;
             }
-
-            // 读取场景
-            var scene = map.scene;
-
-            // 修正一下路径
-            AssetBundleScene correctedScene = scene;
-            AssetBundleDesc desc = correctedScene.assetbundle;
-            desc.path = $"{GameMapManager.resourceDir}/{desc.path}";
-            correctedScene.assetbundle = desc;
 
             // 为了读取entity
             GameMapReader mapReader = new GameMapReader(map.rawContent);
             // enter scene
+            isLoading = true;
+
+            // 修正一下assebundle路径
+            AssetBundleScene correctedScene = map.scene;
+            AssetBundleDesc desc = map.scene.assetbundle;
+            desc.path = $"{GamePlay.settings.resourcePath}/{desc.path}";
+            correctedScene.assetbundle = desc;
+
             AssetBundleSceneManager.LoadScene(correctedScene, mode, async () => {
-                activeScene = SceneManager.GetSceneByName(correctedScene.sceneName);
+
+                // 加载天气系统
+                WeatherSystem.Load();
+
+                // 等一帧，有些插件如Unistorm weather等需要初始化
+                await new YieldInstructionAwaiter(null).Task;
+
+                if (interruptLoading)
+                {
+                    interruptLoading = false;
+                    isLoading = false;
+
+                    if(mode == LoadSceneMode.Additive)
+                    {
+                        await SceneManager.UnloadSceneAsync(map.scene.sceneName);
+                    }
+
+                    return;
+                }
+
+                activeScene = SceneManager.GetSceneByName(map.scene.sceneName);
                 SceneManager.SetActiveScene(activeScene);
 
                 // entity 实例化
@@ -222,7 +287,7 @@ namespace Wugou
                 for (int i = 0; i < entities.Count; i++)
                 {
                     var entity = entities[i];
-                    await GameEntityManager.InstantiateGameObject(entity);
+                    await GameEntity.Instantiate(entity);
                     SceneManager.MoveGameObjectToScene(entity.gameObject, GameWorld.activeScene);
 
                     gameEntities.Add(entity);
@@ -232,12 +297,13 @@ namespace Wugou
                 WeatherSystem.activeWeather = map.weather;
                 WeatherSystem.ApplyWeather();
 
-                isGameMapLoaded = true;
                 // 
                 onLoadedGameMap?.Invoke();
 
                 // 加载新脚本
                 loadedMap = map;
+
+                isLoading = false;
             });
         }
 
@@ -258,7 +324,7 @@ namespace Wugou
 
                     foreach(var v in gameEntities)
                     {
-                        if (v)
+                        if (v && v.gameObject)
                         {
                             GameObject.Destroy(v.gameObject);
                         }
@@ -270,7 +336,6 @@ namespace Wugou
 
             // finally clear all gameobjects
             gameEntities.Clear();
-            isGameMapLoaded = false;
         }
 
 
@@ -283,17 +348,20 @@ namespace Wugou
             JObject jo = new JObject();
 
             // 写入所有的assetbundle
-            Dictionary<int, AssetBundleDesc> assetbundlesDict = new Dictionary<int, AssetBundleDesc>();
-            assetbundlesDict.Add(GameWorld.loadedAssetbundleScene.assetbundle.id, GameWorld.loadedAssetbundleScene.assetbundle);
-            for (int i = 0; i < GameWorld.gameEntities.Count; i++)
-            {
-                var ab = GameWorld.gameEntities[i].blueprint.assetDesc.assetbundle;
-                assetbundlesDict[ab.id] = ab;
-            } 
+            //Dictionary<string, AssetBundleDesc> assetbundlesDict = new Dictionary<string, AssetBundleDesc>();
+            //assetbundlesDict.Add(GameWorld.loadedAssetbundleScene.assetbundle.path, GameWorld.loadedAssetbundleScene.assetbundle);
+            //for (int i = 0; i < GameWorld.gameEntities.Count; i++)
+            //{
+            //    var ab = GameWorld.gameEntities[i].blueprint.assetDesc.assetbundle;
+            //    if (!string.IsNullOrEmpty(ab.path))
+            //    {
+            //        assetbundlesDict[ab.path] = ab;
+            //    }
+            //}
 
-            var serializer = new JsonSerializer() { Converters = { new GameEntityConverter(), new AssetBundleDescHashConvert(assetbundlesDict), new Vector3Converter() } };
+            var serializer = JsonSerializerGlobal.commonSerializer;
 
-            jo.Add("assetbundles", JArray.FromObject(assetbundlesDict.Values.ToArray()));
+            //jo.Add("assetbundles", JArray.FromObject(assetbundlesDict.Values.ToArray()));
 
             // scene
             jo.Add("scene", JToken.FromObject(loadedAssetbundleScene, serializer));

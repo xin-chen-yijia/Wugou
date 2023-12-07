@@ -13,12 +13,12 @@ namespace Wugou.MapEditor
     using InputField = TMPro.TMP_InputField;
 
     [AttributeUsage(AttributeTargets.Class)]
-    public class  CustomPropertyView : Attribute
+    public class  CustomGameComponentView : Attribute
     {
-        public string viewName { get; private set; }
-        public CustomPropertyView(string viewName)
+        public Type componentViewType { get; private set; }
+        public CustomGameComponentView(Type componentviewType)
         {
-            this.viewName = viewName;
+            this.componentViewType = componentviewType;
         }
     }
 
@@ -32,30 +32,32 @@ namespace Wugou.MapEditor
             get { return gameObject.transform.Find("Name").GetComponent<Text>().text; }
             set { gameObject.transform.Find("Name").GetComponent<Text>().text = value; }
         }
-    }
 
-    public class PropertyView<T> : PropertyView
-    {
+        protected object value_;
 
-        protected T value_ = default(T);
-        public UnityEvent<T> onValueChanged = new UnityEvent<T>();
-        public virtual void SetValue(T value)
+        public virtual void SetValue(object value)
         {
+            value_ = value;
             transform.Find("Input").GetComponent<InputField>().text = value.ToString();
         }
 
-        public virtual T ParseFromString(string value)
+        public virtual object GetValue()
+        {
+            return value_;
+        }
+
+        public virtual void ParseFromString(string value)
         {
             throw new NotImplementedException();
         }
 
-        protected virtual void Start()
+        public virtual void AddUpdateEvent(System.Action action)
         {
             transform.Find("Input").GetComponent<InputField>().onValueChanged.AddListener((val) =>
             {
-                onValueChanged.Invoke(ParseFromString(val));
+                ParseFromString(val);
+                action?.Invoke();
             });
         }
-    }
-    
+    }    
 }

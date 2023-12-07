@@ -11,7 +11,6 @@ namespace Wugou
     /// </summary>
     public struct AssetBundleDesc
     {
-        public int id => path.GetHashCode();  
         public string path;
     }
 
@@ -21,6 +20,7 @@ namespace Wugou
     public struct AssetBundleAsset
     {
         public string asset;
+        public string type;
         public AssetBundleDesc assetbundle;
     }
 
@@ -42,5 +42,6 @@ namespace Wugou
         public List<string> tags;
         public string icon;
         public AssetBundleScene scene;
+        public string description;
     }
 }

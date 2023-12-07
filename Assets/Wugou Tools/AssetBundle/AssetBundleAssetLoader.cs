@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using System.Threading.Tasks;
 using UnityEngine.Networking;
 using System.Threading;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.TaskbarClock;
 
 namespace Wugou
 {
@@ -62,15 +63,11 @@ namespace Wugou
         /// </summary>
         public string error { get; private set; } = "status ok!";
 
-        // AB包存放路径
-        private string assetbundlesDir_ = string.Empty;  
-        public string assetbundleDir
-        {
-            get
-            {
-                return assetbundlesDir_;
-            }
-        }
+        //
+        /// <summary>
+        /// AB包存放路径
+        /// </summary>
+        public string assetbundleDir { get; private set; }
 
         private AssetBundleLauchDesc assetbundleLauchDesc_ = null; //assetbundle 描述信息
 
@@ -81,7 +78,7 @@ namespace Wugou
         //避免重复加载
         private Dictionary<string, AssetBundle> loadedBundles_ = new Dictionary<string, AssetBundle>();
 
-        private bool isWebRequest_ = false;    // 是否用UnityWebRequestAssetBundle加载assetbunle
+        private static bool useWebRequest { get; set; } = true;    // 是否用UnityWebRequestAssetBundle加载assetbunle
 
         public bool valid { private set; get; } = true;   //loader 是否有效
 
@@ -105,15 +102,10 @@ namespace Wugou
         private AssetBundleAssetLoader(string path)
         {
             // 为了后续拼接方便
-            assetbundlesDir_ = path.Replace('\\', '/');
-            if (assetbundlesDir_.EndsWith("/"))
+            assetbundleDir = path.Replace('\\', '/');
+            if (assetbundleDir.EndsWith("/"))
             {
-                assetbundlesDir_ = assetbundlesDir_.Substring(0, assetbundlesDir_.Length - 1);
-            }
-
-            if (assetbundlesDir_.StartsWith("http://") || assetbundlesDir_.StartsWith("file:///"))
-            {
-                isWebRequest_ = true;
+                assetbundleDir = assetbundleDir.Substring(0, assetbundleDir.Length - 1);
             }
         }
 
@@ -134,7 +126,7 @@ namespace Wugou
             {
                 if(initializeStatus_ == InitiazlieStatus.kUninitialized || initializeStatus_ == InitiazlieStatus.kInitializing)
                 {
-                    Debug.LogError($"AssetBundle with path: {assetbundlesDir_} not complete initialized...");
+                    Debug.LogError($"AssetBundle with path: {assetbundleDir} not complete initialized...");
                 }
                 return "";
             }
@@ -196,8 +188,8 @@ namespace Wugou
             }
             if (!mainManifest_)
             {
-                string baseAbName = Path.GetFileName(assetbundlesDir_);
-                AssetBundle baseAb = AssetBundle.LoadFromFile(CombinePath(assetbundlesDir_, baseAbName));
+                string baseAbName = Path.GetFileName(assetbundleDir);
+                AssetBundle baseAb = AssetBundle.LoadFromFile(CombinePath(assetbundleDir, baseAbName));
                 mainManifest_ = baseAb.LoadAsset<AssetBundleManifest>("AssetBundleManifest");
                 baseAb.Unload(false);
             }
@@ -209,7 +201,7 @@ namespace Wugou
                     LoadAssetBundleFromFile(v);
                 }
 
-                loadedBundles_[bundleName] = AssetBundle.LoadFromFile(CombinePath(assetbundlesDir_, bundleName));
+                loadedBundles_[bundleName] = AssetBundle.LoadFromFile(CombinePath(assetbundleDir, bundleName));
             }
 
             return loadedBundles_[bundleName];
@@ -268,32 +260,15 @@ namespace Wugou
         }
 
         /// <summary>
-        /// 检查是否有效，如插件引用，VR支持
+        /// 检查 AB包是否有效
         /// </summary>
         /// <returns></returns>
         private AssetBundleLoadResult CheckValid()
         {
-            var puginSupports = Resources.Load<AssetBundlePluginSupports>(AssetBundlePluginSupports.fileName);
-            if (!puginSupports)
-            {
-                Logger.Error($"Resources.Load '{AssetBundlePluginSupports.fileName}' fail...");
-                error = $"Plugin's support file: {AssetBundlePluginSupports.fileName} missing.....";
-                return AssetBundleLoadResult.kPluginSupportFileNotExist;
-            }
-
-            for (int i = 0; i < assetbundleLauchDesc_.plugins.Count; ++i)
-            {
-                if (!puginSupports.plugins.Contains(assetbundleLauchDesc_.plugins[i]))
-                {
-                    error = $"{assetbundlesDir_} require '{assetbundleLauchDesc_.plugins[i]}' missing.....";
-                    return AssetBundleLoadResult.kMissingPlugin;
-                }
-            }
-
             if (assetbundleLauchDesc_.vrAssets && !vrSupport)
             {
                 //error = $"assetbundle's vr support not same";
-                Logger.Warning($"{assetbundlesDir_} is VR Assets, but loader not support vr...");
+                Logger.Warning($"{assetbundleDir} is VR Assets, but loader not support vr...");
                 //return false;
             }
 
@@ -314,22 +289,29 @@ namespace Wugou
             return result;
         }
 
-         // 使用C#的async和await的异步编程
+        // 使用C#的async和await的异步编程
 
         /// <summary>
-        /// http或file开头的路径使用WebRequest，其它的路径当做本地文件处理
+        /// 只支持绝对路径
         /// </summary>
-        /// <param name="path"></param>
+        /// <param name="path">assetbundle的路径</param>
         public static async Task<AssetBundleAssetLoader> GetOrCreate(string path)
         {
-            path = Path.GetFullPath(path).ToLower().Replace('\\','/').TrimEnd('/');  // 统一路径
-            if (!sLoaders_.ContainsKey(path))
+            // 这里只对本地路径有效，对http无效
+            if (!Path.IsPathRooted(path))
             {
-                var newLoader = new AssetBundleAssetLoader(path);
-                sLoaders_.Add(path, newLoader);
+                path = Path.GetFullPath(path);
             }
 
-            var loader = sLoaders_[path];
+            path = path.Replace('\\','/').TrimEnd('/');  // 统一路径
+            string lowerPath = path.ToLower();
+            if (!sLoaders_.ContainsKey(lowerPath))
+            {
+                var newLoader = new AssetBundleAssetLoader(path);
+                sLoaders_.Add(lowerPath, newLoader);
+            }
+
+            var loader = sLoaders_[lowerPath];
             var res = await loader.Init();
             if (res != AssetBundleLoadResult.kSuccess)
             {
@@ -339,7 +321,6 @@ namespace Wugou
 
             return loader;
         }
-
 
         /// <summary>
         /// 初始化
@@ -356,16 +337,10 @@ namespace Wugou
                     result = result == AssetBundleLoadResult.kSuccess ? CheckValid() : result;                   
                     break;
                 case InitiazlieStatus.kInitializing:
-                    var t = Task.Run(() =>
+                    while (initializeStatus_ == InitiazlieStatus.kInitializing)
                     {
-                        while (initializeStatus_ == InitiazlieStatus.kInitializing)
-                        {
-                            Task.Delay(1000).Wait();
-                        }
-
-                    });
-
-                    await t;
+                        await new YieldInstructionAwaiter(new WaitForSeconds(1.0f));
+                    }
                     break;
                 default:
                     break;
@@ -387,7 +362,7 @@ namespace Wugou
             var bundle = await LoadAssetBundleAsync(bundleName);
             if (!bundle || !bundle.Contains(assetName))
             {
-                Logger.Error($"Assetbundle '{assetbundlesDir_}' not contain's {assetName}");
+                Logger.Error($"Assetbundle '{assetbundleDir}' not contain's {assetName}");
                 return null;
             }
             return bundle.LoadAsset<T>(assetName);
@@ -434,18 +409,19 @@ namespace Wugou
         /// <returns></returns>
         public async Task<AssetBundle> LoadAssetBundleAsync(string bundleName)
         {
+            Logger.DebugInfo($"Start load assetbundle {bundleName}");
             if (string.IsNullOrEmpty(bundleName))
             {
                 Logger.Error("LoadAssetBundleAsync: empty bundle name");
                 return null;
             }
 
-            System.Func<string, Task<AssetBundle>> LoadAssetbundleFunc = isWebRequest_ ? LoadAssetbundleAsync_web : LoadAssetbundleAsync_file;
+            System.Func<string, Task<AssetBundle>> LoadAssetbundleFunc = useWebRequest ? LoadAssetbundleAsync_web : LoadAssetbundleAsync_file;
 
             if (!mainManifest_)
             {
-                string baseAbName = Path.GetFileName(assetbundlesDir_);
-                string manifestBundlePath = CombinePath(assetbundlesDir_, baseAbName);
+                string baseAbName = Path.GetFileName(assetbundleDir);
+                string manifestBundlePath = CombinePath(assetbundleDir, baseAbName);
 
                 AssetBundle manifestBundle = await LoadAssetbundleFunc(manifestBundlePath);
                 mainManifest_ = manifestBundle.LoadAsset<AssetBundleManifest>("AssetBundleManifest");
@@ -455,7 +431,7 @@ namespace Wugou
             {
                 if (!loadingAssetBundles_.ContainsKey(bundleName)) // bundle未加载
                 {
-                    loadingAssetBundles_.Add(bundleName,true);
+                    loadingAssetBundles_.Add(bundleName, true);
 
                     string[] dps = mainManifest_.GetAllDependencies(bundleName);
                     foreach (var v in dps)
@@ -463,7 +439,7 @@ namespace Wugou
                         await LoadAssetBundleAsync(v);
                     }
 
-                    string bundlePath = CombinePath(assetbundlesDir_, bundleName);
+                    string bundlePath = CombinePath(assetbundleDir, bundleName);
 
                     loadedBundles_[bundleName] = await LoadAssetbundleFunc(bundlePath);
 
@@ -471,19 +447,16 @@ namespace Wugou
                 }
                 else        // 加载中
                 {
-                    Task t = Task.Run(() =>
+                    while (loadingAssetBundles_.ContainsKey(bundleName) && loadingAssetBundles_[bundleName])
                     {
-                        while (loadingAssetBundles_.ContainsKey(bundleName) && loadingAssetBundles_[bundleName])
-                        {
-                            Task.Delay(100).Wait();
-                        }
-                    });
-
-                    await t;
+                        //await Task.Delay(100);    // webgl 平台不行
+                        await new YieldInstructionAwaiter(new WaitForSeconds(0.1f));
+                    }
                 }
 
             }
 
+            Logger.DebugInfo($"Load assetbundle {bundleName} Complete");
             return loadedBundles_.ContainsKey(bundleName) ? loadedBundles_[bundleName] : null;
         }
 
@@ -494,10 +467,10 @@ namespace Wugou
         private async Task<AssetBundleLoadResult> LoadAssetBundleLaunchConfig()
         {
             string configContent = string.Empty;
-            if (isWebRequest_)
+            if (useWebRequest)
             {
-                Logger.Info("load web assetbundle: " + assetbundlesDir_ + "/" + kLauchDescFileName);
-                UnityWebRequest www = UnityWebRequest.Get(assetbundlesDir_ + "/" + kLauchDescFileName);
+                Logger.Info("load web assetbundle: " + assetbundleDir + "/" + kLauchDescFileName);
+                UnityWebRequest www = UnityWebRequest.Get(assetbundleDir + "/" + kLauchDescFileName);
                 await www.SendWebRequest();
 
                 if (www.result != UnityWebRequest.Result.Success)
@@ -531,25 +504,38 @@ namespace Wugou
                 //await tAwaiter();
 
                 bool valid = true;
-                string filePath = CombinePath(assetbundlesDir_, kLauchDescFileName);
-                var task = Task.Run(() =>
+                string filePath = CombinePath(assetbundleDir, kLauchDescFileName);
+                if (File.Exists(filePath))
                 {
-                    if (File.Exists(filePath))
-                    {
-                        configContent = File.ReadAllText(filePath);
+                    configContent = File.ReadAllText(filePath);
 
-                    }
-                    else
-                    {
-                        valid = false;
-                    }
-                });
+                }
+                else
+                {
+                    valid = false;
+                }
 
-                await task;
+                // 废弃，Task是基于线程池的，也就是非常吃当前任务安排情况，所以await并非等的是当前任务的执行时间，而是整个系统的任务调度时间
+                //var task = Task.Run(() =>
+                //{
+                //    if (File.Exists(filePath))
+                //    {
+                //        Debug.Log("D read file:" + filePath);
+                //        configContent = File.ReadAllText(filePath);
+                //        Debug.Log("D read file end:" + filePath);
+
+                //    }
+                //    else
+                //    {
+                //        valid = false;
+                //    }
+                //});
+
+                //await task;
                 if (!valid)
                 {
                     error = $"AssetBundle's description file: {filePath}  not exists...";
-                    Logger.Warning(error);
+                    Logger.Error(error);
                     return AssetBundleLoadResult.kDescriptionFileNotExist;
                 }
             }

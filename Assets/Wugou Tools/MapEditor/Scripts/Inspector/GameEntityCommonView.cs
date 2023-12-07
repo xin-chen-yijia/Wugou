@@ -16,7 +16,7 @@ namespace Wugou.MapEditor
             {
                 if (target)
                 {
-                    target.name = value;
+                    target.GetComponent<GameEntity>().entityName = value;
                 }
             });
         }
@@ -29,7 +29,7 @@ namespace Wugou.MapEditor
 
         public override void OnNewTarget(GameObject target)
         {
-            nameInput.text = target.name;
+            nameInput.text = target.GetComponent<GameEntity>().entityName;
         }
 
         public override bool CheckTargetValid()

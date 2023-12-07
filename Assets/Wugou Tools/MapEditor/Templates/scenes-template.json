@@ -1,0 +1,13 @@
+[
+    {
+        "name":"测试",
+        "tags":["工厂","高层建筑","地铁","学校","森林","矿山","车站","高速公路","火灾","地震","洪涝","泥石流","公共卫生事件"],
+        "scene":{
+            "sceneName":"Test",
+            "assetbundle":"assetbundles/Test"
+        },
+        "icon":"images/scenes/JIXIDC.png",
+        "description":"中等地形，适合10-20人协同训练。"
+
+    }
+]

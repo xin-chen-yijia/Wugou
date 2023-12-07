@@ -13,15 +13,19 @@ namespace Wugou
         private static Dictionary<int,StartPosition> allPositions = new Dictionary<int,StartPosition>();
         public static int positionCount => allPositions.Count;
 
-        public static Transform positionAt(int id) => allPositions[id].transform;
+        public static Transform positionAt(int id) => id<allPositions.Count ? allPositions[id].transform : null;
+        
 
-        public override void BeginPlay()
+        private void Awake()
         {
-            id = allPositions.Count;
-            allPositions.Add(id, this);
+            if(GamePlay.isGaming)
+            {
+                id = allPositions.Count;
+                allPositions.Add(id, this);
 
-            // hide on game
-            gameObject.SetActive(false);
+                // hide on game
+                gameObject.SetActive(false);
+            }
         }
 
         public override void EndPlay()

@@ -1,6 +1,5 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Wugou.MapEditor;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -12,41 +11,34 @@ using Newtonsoft.Json.Converters;
 namespace Wugou
 {
     /// <summary>
+    /// 用于指定不序列化的Field
+    /// </summary>
+    public class NonSerializeField : Attribute
+    {
+
+    }
+
+    public static class JsonSerializerGlobal
+    {
+        public static JsonConverterCollection commonConverts = new JsonConverterCollection() { new GameEntityConverter(), new AssetBundleDescConvert(), new Vector3Converter() };
+
+        public static JsonSerializer commonSerializer = JsonSerializer.Create(new JsonSerializerSettings() { Converters = JsonSerializerGlobal.commonConverts });
+    }
+
+    /// <summary>
     /// AssetBundleDesc 序列化
     /// 采用引用的方式，避免每个地方都是AssetBundle的全部内容
     /// </summary>
-    public class AssetBundleDescHashConvert : JsonConverter<AssetBundleDesc>
+    public class AssetBundleDescConvert : JsonConverter<AssetBundleDesc>
     {
-        private Dictionary<int, AssetBundleDesc> assetBundles_;
-        public List<AssetBundleDesc> assetbundleDescs => assetBundles_.Values.ToList();
-
-        public AssetBundleDescHashConvert(Dictionary<int, AssetBundleDesc> descriptions)
-        {
-            assetBundles_ = descriptions;
-        }
-
         public override void WriteJson(JsonWriter writer, AssetBundleDesc value, JsonSerializer serializer)
         {
-            if(!assetBundles_.ContainsKey(value.id)) 
-            { 
-                assetBundles_.Add(value.id, value);
-            }
-
-            writer.WriteValue(value.id);
+            writer.WriteValue(value.path);
         }
 
         public override AssetBundleDesc ReadJson(JsonReader reader, Type objectType, AssetBundleDesc existingValue, bool hasExistingValue, JsonSerializer serializer)
         {
-            int id = Convert.ToInt32(reader.Value);
-            if(assetBundles_.ContainsKey(id))
-            {
-                return assetBundles_[id];
-            }
-            else
-            {
-                Debug.LogError($"Can't find assetbundle with id:{id}");
-                return assetBundles_.First().Value;
-            }
+            return new AssetBundleDesc() { path = (string)reader.Value };
         }
     }
 
@@ -63,8 +55,28 @@ namespace Wugou
             var settings = new JsonSerializerSettings { Converters = serializer.Converters };
             foreach (var comp in entity.GetComponents<GameComponent>())
             {
-                // 注意：这里list是合并而非替换
-                JsonConvert.PopulateObject(jo[comp.GetType().Name].ToString(), comp, settings);
+                // 处理list的问题，PopulateObject是追加而非替换
+                var compType = comp.GetType();
+                foreach (var field in compType.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+                {
+                    if (field.GetCustomAttribute<SerializeField>() != null && Utils.IsList(field.FieldType))
+                    {
+                        var clearMethod = field.FieldType.GetMethod("Clear");
+                        clearMethod.Invoke(field.GetValue(comp), new object[] { });
+                    }
+                }
+
+                foreach (var field in compType.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+                {
+                    if (field.GetCustomAttribute<SerializeField>() != null && Utils.IsList(field.PropertyType))
+                    {
+                        var clearMethod = field.PropertyType.GetMethod("Clear");
+                        clearMethod.Invoke(field.GetValue(comp), new object[] { });
+                    }
+                }
+
+                JsonConvert.PopulateObject(jo[compType.Name].ToString(), comp, settings);
+
             }
 
             return entity;
@@ -73,13 +85,17 @@ namespace Wugou
         public override void WriteJson(JsonWriter writer, GameEntity value, JsonSerializer serializer)
         {
             JObject jo = new JObject();
-            foreach (var v in value.GetComponents<GameComponent>())
+            foreach (var comp in value.GetComponents<GameComponent>())
             {
                 JObject comJo = new JObject();
-                Type t = v.GetType();
+                Type t = comp.GetType();
                 foreach(var field in t.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
                 {
-                    comJo.Add(field.Name, JToken.FromObject(field.GetValue(v), serializer));
+                    if (field.GetCustomAttribute<NonSerializeField>() != null)
+                    {
+                        continue;
+                    }
+                    comJo.Add(field.Name, JToken.FromObject(field.GetValue(comp), serializer));
                 }
 
                 // property and serialize field
@@ -87,7 +103,7 @@ namespace Wugou
                 {
                     if(field.GetCustomAttribute<SerializeField>() != null)
                     {
-                        comJo.Add(field.Name, JToken.FromObject(field.GetValue(v), serializer));
+                        comJo.Add(field.Name, JToken.FromObject(field.GetValue(comp), serializer));
                     }
                 }
 

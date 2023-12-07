@@ -25,7 +25,7 @@ namespace Wugou.UI
         public void SetProgress(float progress)
         {
             progressBar.value = progress;
-            progressText.text = string.Format("{0:F}%", progress * 100);
+            progressText.text = string.Format("{0:F0}%", progress * 100);
         }
     }
 

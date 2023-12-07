@@ -29,7 +29,7 @@ namespace Wugou.XR
             {
                 m_SelectedXRLoader = XRGeneralSettings.Instance.Manager.activeLoaders[loaderIndex];
             }
-            CoroutineLauncher.avtive.StartCoroutine(StartXRCoroutine(onStart));
+            CoroutineLauncher.active.StartCoroutine(StartXRCoroutine(onStart));
         }
 
         static IEnumerator StartXRCoroutine(UnityAction onStart)

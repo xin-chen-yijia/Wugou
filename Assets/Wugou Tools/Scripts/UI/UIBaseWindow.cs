@@ -68,11 +68,11 @@ namespace Wugou.UI
         /// <typeparam name="T"></typeparam>
         /// <param name="objName">子物体名字</param>
         /// <returns></returns>
-        public T GetChildWindow<T>(string objName = "") where T : UIBaseWindow
+        public T GetChildWindow<T>(string objName = "", bool includeinactive = true) where T : UIBaseWindow
         {
             if (string.IsNullOrEmpty(objName))
             {
-                return transform.GetComponentInChildren<T>(true);
+                return transform.GetComponentInChildren<T>(includeinactive);
             }
 
             var go = transform.Find(objName);

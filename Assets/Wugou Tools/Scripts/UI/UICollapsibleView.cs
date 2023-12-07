@@ -11,6 +11,9 @@ namespace Wugou.UI
     public class UICollapsibleView : MonoBehaviour
     {
         public GameObject headObj;
+        public RectTransform content;
+        // 折叠相关高度
+        public float foldedHeight => headObj.GetComponent<RectTransform>().rect.height;
 
         /// <summary>
         /// 标题
@@ -19,22 +22,18 @@ namespace Wugou.UI
         {
             get
             {
-                return headObj.GetComponent<Text>().text;
+                return headObj.GetComponentInChildren<Text>().text;
             }
 
             set
             {
-                headObj.GetComponent<Text>().text = value;
+                headObj.GetComponentInChildren<Text>().text = value;
             }
         }
 
         private bool isFolded = false;
 
-        // 折叠相关高度
-        public float foldedHeight = 20;
-        private float height = 225;
 
-        public RectTransform content => transform.Find("Content") as RectTransform;
 
         // Start is called before the first frame update
         void Start()
@@ -78,7 +77,7 @@ namespace Wugou.UI
             content.localPosition = pos;
 
             // size
-            height = foldedHeight + content.sizeDelta.y;
+            float height = foldedHeight + content.sizeDelta.y;
             var sz = GetComponent<RectTransform>().sizeDelta;
             sz.y = height;
             GetComponent<RectTransform>().sizeDelta = sz;
@@ -108,9 +107,10 @@ namespace Wugou.UI
 
         public void Unfold()
         {
-            Vector2 sz = GetComponent<RectTransform>().sizeDelta;
-            sz.y = height;
-            GetComponent<RectTransform>().sizeDelta = sz;
+            //Vector2 sz = GetComponent<RectTransform>().sizeDelta;
+            //sz.y = foldedHeight + content.sizeDelta.y;
+            //GetComponent<RectTransform>().sizeDelta = sz;
+            Resize();
 
             content.gameObject.SetActive(true);
             transform.Find("Head/FoldButton/Unfold").gameObject.SetActive(true);

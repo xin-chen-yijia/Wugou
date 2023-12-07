@@ -1,0 +1,12 @@
+[
+    {
+        "name": "StartPosition",
+        "type": "GameObject",
+        "asset": {
+            "asset": "StartPos",
+            "assetbundle": "assetbundles/main"
+        },
+        "icon": "images/StartPos.png",
+        "description": ""
+    }
+]
