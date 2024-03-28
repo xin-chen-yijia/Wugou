@@ -16,7 +16,7 @@ namespace Wugou.Examples.UI
         public Button createBtn;
         public Button lastBtn;
 
-        private GameMap selectedGameMap_ = null;
+        private GameMapPackage selectedGameMap_ = null;
 
 
         // Start is called before the first frame update
@@ -27,7 +27,7 @@ namespace Wugou.Examples.UI
             {
                 if (selectedGameMap_ == null)
                 {
-                    rootWindow.GetChildWindow<MakeSurePage>().ShowTips("请先选择一个脚本。");
+                    DaemonUI.makeSurePage.Tips("请先选择一个脚本。");
                     return;
                 }
 
@@ -49,7 +49,6 @@ namespace Wugou.Examples.UI
         {
             var page = rootWindow.GetChildWindow<SimpleInRoomPage>();
             page.Show();
-            page.SetPlayerCount(selectedGameMap_.maxPlayerCount);
             page.SetGameMap(selectedGameMap_);
             page.SetAsRoomOwner(true);
 
@@ -62,14 +61,19 @@ namespace Wugou.Examples.UI
 
         //}
 
-        public void SetGameMaps(List<GameMap> gameMaps)
+        public override void Show(bool asTop = false)
         {
+            base.Show(asTop);
+
             selectedGameMap_ = null;
+
+            var gameMaps = Gameplay.gameMapManager.GetAllNames();
 
             GameObject lastChecked = null;
             float lastClickTime = -1;
-            Utils.FillContent(rowContainer, rowPrefab, gameMaps, (item, map) =>
+            Utils.FillContent(rowContainer, rowPrefab, gameMaps, (item, packageName) =>
             {
+                var map = Gameplay.gameMapManager.Get(packageName);
                 item.GetComponent<Button>().onClick.AddListener(() =>
                 {
                     lastChecked?.SetActive(false);
@@ -98,15 +102,23 @@ namespace Wugou.Examples.UI
             {
                 rowContainer.transform.GetChild(0).GetComponent<Button>().onClick.Invoke();
             }
-
         }
 
-        private void FillMapContent(GameMap map)
+        private void FillMapContent(GameMapPackage package)
         {
-            string iconName = GameMapManager.GetAssetbundleSceneIcon(map.scene.sceneName);
-            Utils.LoadSpriteFromFileWithWebRequest(System.IO.Path.GetFullPath($"{GamePlay.settings.resourcePath}/{iconName}"), new Vector2(0.5f, 0.5f), (sprite) =>
+            var map = package.gameMap;
+            Utils.DoAsync(async () =>
             {
-                transform.Find("Main/Right/Icon").GetComponent<Image>().sprite = sprite;
+                foreach (var v in Gameplay.unitySceneManager.GetAllNames())
+                {
+                    var us = Gameplay.unitySceneManager.Get(v);
+                    if (us.scene == map.scene)
+                    {
+                        transform.Find("Main/Right/Icon").GetComponent<Image>().sprite = await GameAssetDatabase.GetAssetAsync<Sprite>(us.thumbnail);
+                        break;
+                    }
+                }
+                
             });
             transform.Find("Main/Right/Details/Name").GetComponent<TMP_Text>().text = $"脚本名称：{map.name}";
             transform.Find("Main/Right/Details/Author").GetComponent<TMP_Text>().text = $"作者：{map.author}";

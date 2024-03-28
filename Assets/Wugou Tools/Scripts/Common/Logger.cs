@@ -38,6 +38,11 @@ namespace Wugou
             }
         }
 
+        public static void LogExcpetion(System.Exception ex)
+        {
+            Debug.LogException(ex);
+        }
+
         public static void DebugInfo(object message)
         {
 #if UNITY_EDITOR
@@ -54,6 +59,10 @@ namespace Wugou
         }
 
         public static void Error(object message)
+        {
+        }
+
+        public static void LogExcpetion(System.Exception ex)
         {
         }
 

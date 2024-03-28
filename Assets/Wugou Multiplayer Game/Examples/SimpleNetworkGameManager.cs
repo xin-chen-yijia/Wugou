@@ -45,7 +45,7 @@ namespace Wugou.Examples
                 {"教师",0 },
                 {"学生",1 },
             };
-            uiRootWindow.GetChildWindow<SimpleInRoomPage>().SetRoleOptions(roleDropdownOptions);
+            GameObject.FindObjectOfType<SimpleInRoomPage>().SetRoleOptions(roleDropdownOptions);
         }
 
         // Update is called once per frame
@@ -66,15 +66,20 @@ namespace Wugou.Examples
         {
             var gameStats = new SimpleGameStats();
             gameStats.name = "replay_" + System.DateTime.Now.ToFileTimeUtc();
-            gameStats.gamemap = gameMap.name;
+            gameStats.gamemap = gameMapPackage.path.Replace("\\", "/").Replace(Gameplay.gameMapManager.path, "");
             gameStats.duration = Time.realtimeSinceStartup;
-            GamePlay.lastGameStats = gameStats;
+            Gameplay.lastGameStats = gameStats;
         }
 
         public override void UpdateGameplayerSnapshot(MultiplayerGamePlayer player)
         {
-            var gameStats = GamePlay.lastGameStats as SimpleGameStats;
+            var gameStats = Gameplay.lastGameStats as SimpleGameStats;
             gameStats.playerStats[player.name] = new SimpleGameSnapshot() { name = "Jack", score = 100 };
+        }
+
+        protected override void SaveGameStat()
+        {
+            Debug.Log("Save Game Stat");
         }
     }
 

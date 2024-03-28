@@ -50,7 +50,8 @@ namespace Wugou.Examples.UI
             GameObject lastCheck = null;
             Utils.FillContent(rowContainer, rowPrefab, records, (item, stats) =>
             {
-                var record = GamePlay.gameStatsManager.GetGameStats<SimpleGameStats>($"{stats.name}{GameStatsManager.kSuffix}");
+                var statsManager = Gameplay.gameStatsManager as FileAssetsManager<SimpleGameStats>;
+                var record = statsManager.Get($"{stats.name}");
                 item.transform.Find("Name").GetComponent<TMP_Text>().text = record.name;
                 item.transform.Find("Script").GetComponent<TMP_Text>().text = record.gamemap;
                 item.transform.Find("Duration").GetComponent<TMP_Text>().text = new TimeSpan(0, 0, (int)record.duration).ToString(@"hh\:mm\:ss");
@@ -100,13 +101,8 @@ namespace Wugou.Examples.UI
         {
             base.Show(asTop);
 
-            // Ë¢ÐÂÒ»´Î
-            if(GamePlay.gameStatsManager.GetGameStatBriefs().Count == 0)
-            {
-                GamePlay.gameStatsManager.UpdateGameStatBriefs();
-            }
-
-            SetTrainingRecord(GamePlay.gameStatsManager.GetAllGameStats<SimpleGameStats>());
+            var statsManager = Gameplay.gameStatsManager as FileAssetsManager<SimpleGameStats>;
+            SetTrainingRecord(statsManager.GetAll());
             listPage.SetActive(true);
             detailPage.SetActive(false);
         }

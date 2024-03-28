@@ -4395,6 +4395,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerRowContainer: {fileID: 6015565771007379018}
   playerRowPrefab: {fileID: 6015565771002198400}
+  startButton: {fileID: 0}
+  quitButton: {fileID: 0}
+  mapIconImage: {fileID: 0}
+  nameLabel: {fileID: 0}
+  authorLabel: {fileID: 0}
+  createTimeLabel: {fileID: 0}
+  descriptionLabel: {fileID: 0}
 --- !u!1 &6015565770812492631
 GameObject:
   m_ObjectHideFlags: 0
@@ -4816,7 +4823,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!1 &6015565770987212848
 GameObject:
   m_ObjectHideFlags: 0
@@ -5595,6 +5602,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 209d182d142d2a842b7d6d201bd5c382, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  okButton1_: {fileID: 0}
+  cancelButton1_: {fileID: 0}
+  content_: {fileID: 0}
+  okButton2_: {fileID: 0}
 --- !u!1 &6015565771163427640
 GameObject:
   m_ObjectHideFlags: 0

@@ -4,8 +4,9 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using UnityEngine.Events;
 
-namespace Wugou.Examples
+namespace Wugou.UI
 {
     public class LoginPage : MonoBehaviour
     {
@@ -14,11 +15,14 @@ namespace Wugou.Examples
         public TMP_Text tipsLabel;
 
         public Button loginButton;
+        public Button quitButton;
+
+        public UnityEvent onLogin = new UnityEvent();
 
         // Start is called before the first frame update
         void Start()
         {
-            loginButton.onClick.AddListener(() =>
+            loginButton.onClick.AddListener(async () =>
             {
                 if (string.IsNullOrEmpty(nameInput.text))
                 {
@@ -27,22 +31,21 @@ namespace Wugou.Examples
                     return;
                 }
 
-                var user = Authorization.Find(nameInput.text, pwdInput.text);
-                if (user == null)
+                var succ = await Authorization.Login(nameInput.text, pwdInput.text);
+                if (!succ)
                 {
                     tipsLabel.gameObject.SetActive(true);
                 }
                 else
                 {
-                    //Hide();
-
-                    GamePlay.loginInfo = new Authorization.User()
-                    {
-                        name = nameInput.text,
-                        role = Authorization.Role.kRoleAdmin,
-                    };
-                    SceneManager.LoadScene(GamePlay.settings.mainSceneName);
+                    onLogin.Invoke();
+                    SceneManager.LoadScene(Gameplay.settings.clienScene);
                 }
+            });
+
+
+            quitButton.onClick.AddListener(() => {
+                Application.Quit(); 
             });
         }
 

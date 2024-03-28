@@ -37,7 +37,6 @@ namespace Wugou.Examples.UI
             {
                 var page = rootWindow.GetChildWindow<SimpleCreateRoomPage>();
                 page.Show();
-                page.SetGameMaps(GameMapManager.GetAllGameMaps());
 
                 Hide();
             });
@@ -52,7 +51,7 @@ namespace Wugou.Examples.UI
         {
             if (activeResponse_.uri != null)
             {
-                MultiplayerGameManager.instance.EnterRoom(activeResponse_.uri);
+                MultiplayerGameManager.instance.EnterRoom(activeResponse_);
                 var page = rootWindow.GetChildWindow<SimpleInRoomPage>();
                 page.SetAsRoomOwner(false);
                 page.SetPlayerCount(activeResponse_.maxPlayerCount);
@@ -106,7 +105,7 @@ namespace Wugou.Examples.UI
                 go.SetActive(true);
                 Utils.ResizeContainerHeight(roomRowContainer);
 
-                go.transform.Find("RoomButton/Name").GetComponent<TMP_Text>().text = $"{response.gameMap}";
+                go.transform.Find("RoomButton/Name").GetComponent<TMP_Text>().text = $"{response.gameMapPackage}";
                 go.transform.Find("RoomButton/Author").GetComponent<TMP_Text>().text = $"{response.playerName}";
                 go.transform.Find("RoomButton/Count").GetComponent<TMP_Text>().text = $"{response.maxPlayerCount}";
                 var button = go.GetComponentInChildren<Button>();

@@ -49,7 +49,7 @@ namespace Wugou
         /// </summary>
         public static System.Action Clear = () =>
         {
-
+            throw new System.Exception("Unimplement WeatherSystem's Clear function.");
         };
     }
 }

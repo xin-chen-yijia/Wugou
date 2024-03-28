@@ -1,18 +1,16 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using System.Linq;
-using System.Reflection;
-using Wugou.UI;
-using Wugou.MapEditor;
 using System;
 using System.IO;
-using Newtonsoft.Json;
 using UnityEngine.SceneManagement;
-
+using Wugou.UI;
 using Mirror;
-using Mirror.Discovery;
-using Wugou.Examples;
+using System.Net.Sockets;
+using System.Threading.Tasks;
+using System.Net;
+using System.Threading;
+using System.Text;
 
 namespace Wugou.Multiplayer
 {
@@ -23,61 +21,31 @@ namespace Wugou.Multiplayer
     {
         public static MultiplayerGameManager instance => (NetworkRoomManager.singleton as MultiplayerGameManager);
 
-        // ui
-        public UIRootWindow uiRootWindow;
-
         /// <summary>
         /// 标识是否正在游戏
         /// </summary>
         public bool isStartedGameplay { get; protected set; }
 
         /// <summary>
-        /// 在房间中的玩家
-        /// </summary>
-        public Dictionary<int, MultiplayerGameRoomPlayer> roomplayers { get; private set; } = new Dictionary<int, MultiplayerGameRoomPlayer>();
-
-        /// <summary>
-        /// 记录当前玩家
-        /// </summary>
-        public Dictionary<int, MultiplayerGamePlayer> gameplayers { get; private set; } = new Dictionary<int, MultiplayerGamePlayer>();
-
-        /// <summary>
-        /// 当前选择的地图
-        /// </summary>
-        public GameMap gameMap { get; protected set; }
-
-        /// <summary>
         /// 游戏开始时间，用于计时
         /// </summary>
         public double gameStartTime { get; protected set; }
 
+        /// <summary>
+        /// server信息
+        /// </summary>
+        public MultiplayerServerResponse serverResponse { get; private set; }
+
         #region UnityFunctions
-
-        public override void Awake()
-        {
-            base.Awake();
-
-            GamePlay.isGaming = true;
-        }
-
-        public override void Start()
-        {
-            base.Start();
-
-            //
-            // SceneObject Type Prefab
-            GameObject[] typePrefabs = Resources.LoadAll<GameObject>("SceneObjectPrototype/Gameplay");
-            foreach (var v in typePrefabs)
-            {
-                GameEntityManager.RegisterPrefab(v.name, v);
-            }
-        }
 
         public override void OnDestroy()
         {
             base.OnDestroy();
-            //
-            GamePlay.isGaming = false;
+
+            if (isStartedGameplay)
+            {
+                StopGameplay();
+            }
         }
 
         public override void OnApplicationQuit()
@@ -95,9 +63,10 @@ namespace Wugou.Multiplayer
         /// <summary>
         /// 服务端在新玩家进入时发送，脚本消息，用于同步加载脚本
         /// </summary>
-        public struct GameMapMessage : NetworkMessage
+        public struct GameMapPackageMessage : NetworkMessage
         {
-            public string content;
+            public string name;
+            public byte[] content;
         }
 
         /// <summary>
@@ -115,19 +84,18 @@ namespace Wugou.Multiplayer
         /// <summary>
         /// 服务器在全部客户端完成游戏场景加载时发送
         /// </summary>
-        public struct ReadyGoMessage : NetworkMessage
+        public struct AllLoadedSceneMessage : NetworkMessage
         {
             public double startTime;
         }
 
         public override void OnRoomStartServer()
         {
-            print("OnRoomStartServer");
+            Logger.DebugInfo("OnRoomStartServer");
             base.OnRoomStartServer();
 
             // 服务端消息处理
             NetworkServer.RegisterHandler<LoadedGameSceneMessage>(OnLoadedGameSceneInternal, false);
-
         }
 
 
@@ -136,18 +104,18 @@ namespace Wugou.Multiplayer
             base.OnRoomStartClient();
 
             // 客户端消息处理 
-            NetworkClient.RegisterHandler<GameMapMessage>(OnReceiveGameMapInternal, false);
+            NetworkClient.RegisterHandler<GameMapPackageMessage>(OnReceiveGameMapInternal, false);
             NetworkClient.RegisterHandler<StartGameMessage>(OnStartGameInternal, false);
-            NetworkClient.RegisterHandler<ReadyGoMessage>(OnReadyGoInternal, false);
+            NetworkClient.RegisterHandler<AllLoadedSceneMessage>(OnAllLoadedSceneInternal, false);
 
-            print("OnRoomStartClient");
+            Logger.DebugInfo("OnRoomStartClient");
         }
 
         public override void OnRoomClientConnect()
         {
             base.OnRoomClientConnect();
 
-            print("OnRoomClientConnect");
+            Logger.DebugInfo("OnRoomClientConnect");
         }
 
 
@@ -158,16 +126,17 @@ namespace Wugou.Multiplayer
         /// <param name="conn">Connection from client.</param>
         public override void OnServerAddPlayer(NetworkConnectionToClient conn)
         {
-            print("OnServerAddPlayer");
+            Logger.DebugInfo("OnServerAddPlayer");
             base.OnServerAddPlayer(conn);
         }
 
-        public override GameObject OnRoomServerCreateRoomPlayer(NetworkConnectionToClient conn)
-        {
-            conn.Send<GameMapMessage>(new GameMapMessage { content = selectedGameMap.rawContent });
+        //public override GameObject OnRoomServerCreateRoomPlayer(NetworkConnectionToClient conn)
+        //{
+        //    // 发送GameMap给客户端
+        //    conn.Send<GameMapPackageMessage>(new GameMapPackageMessage { name = Path.GetFileName(hostGameMapPackage.path), content = File.ReadAllBytes(hostGameMapPackage.path) });
 
-            return base.OnRoomServerCreateRoomPlayer(conn);
-        }
+        //    return base.OnRoomServerCreateRoomPlayer(conn);
+        //}
 
         /// <summary>
         /// Called on the server when a client is ready.
@@ -176,14 +145,14 @@ namespace Wugou.Multiplayer
         /// <param name="conn">Connection from client.</param>
         public override void OnServerReady(NetworkConnectionToClient conn)
         {
-            print("OnServerReady");
+            Logger.DebugInfo("OnServerReady");
             // This fires from a Ready message client sends to server after loading the online scene
             base.OnServerReady(conn);
 
-            if (conn.identity == null)
-            {
-                //StartCoroutine(AddPlayerDelayed(conn));   // 
-            }
+            //if (conn.identity == null)
+            //{
+            //    StartCoroutine(AddPlayerDelayed(conn));   // 
+            //}
         }
 
         //IEnumerator AddPlayerDelayed(NetworkConnectionToClient conn)
@@ -217,19 +186,25 @@ namespace Wugou.Multiplayer
 
             AdvertiseServer();
 
+            //
+            gameMapSync.StartServer();
+
             Debug.Log("OnRoomStartHost");
         }
 
         public override void OnRoomStopHost()
         {
-            print("OnRoomStopHost");
+            Logger.DebugInfo("OnRoomStopHost");
             base.OnRoomStopHost();
+
             StopServerDiscovery();
+
+            gameMapSync.Shutdown();
         }
 
         public override void OnRoomStopClient()
         {
-            print("OnRoomStopClient");
+            Logger.DebugInfo("OnRoomStopClient");
             base.OnRoomStopClient();
         }
 
@@ -246,18 +221,22 @@ namespace Wugou.Multiplayer
                 //});
             }
 
-            print("OnRoomClientDisconnect");
+            Logger.DebugInfo("OnRoomClientDisconnect");
             base.OnRoomClientDisconnect();
 
+            // 确保一下
+            gameMapSync.Shutdown();
+
             // 结束
-            gameMap = null;
-            selectedGameMap = null;
+            gameMapPackage = null;
+
+            // 卸载脚本
+            UnloadGameMap();
+
             if (isStartedGameplay)
             {
                 isStartedGameplay = false;
-
-                // 卸载脚本
-                UnloadGameMap();
+                Gameplay.isGaming = false;
 
                 // for user business
                 OnStopGameplay();
@@ -287,7 +266,7 @@ namespace Wugou.Multiplayer
         public override GameObject OnRoomServerCreateGamePlayer(NetworkConnectionToClient conn, GameObject roomPlayer)
         {
             // get start position from base class
-            Transform startPos = StartPosition.positionAt(roomPlayer.GetComponent<MultiplayerGameRoomPlayer>().playerId);
+            Transform startPos = StartPosition.positionAt(roomPlayer.GetComponent<MultiplayerRoomPlayer>().playerId);
             GameObject gamePlayer = startPos != null
                 ? Instantiate(playerPrefab, startPos.position, startPos.rotation)
                 : Instantiate(playerPrefab, Vector3.zero, Quaternion.identity);
@@ -306,9 +285,9 @@ namespace Wugou.Multiplayer
         public override bool OnRoomServerSceneLoadedForPlayer(NetworkConnectionToClient conn, GameObject roomPlayer, GameObject gamePlayer)
         {
             MultiplayerGamePlayer gplayer = gamePlayer.GetComponent<MultiplayerGamePlayer>();
-            gplayer.playerId = roomPlayer.GetComponent<MultiplayerGameRoomPlayer>().playerId;
-            gplayer.playerName = roomPlayer.GetComponent<MultiplayerGameRoomPlayer>().playerName;
-            gplayer.playerRole = roomPlayer.GetComponent<MultiplayerGameRoomPlayer>().playerRole;
+            gplayer.playerId = roomPlayer.GetComponent<MultiplayerRoomPlayer>().playerId;
+            gplayer.playerName = roomPlayer.GetComponent<MultiplayerRoomPlayer>().playerName;
+            gplayer.playerRole = roomPlayer.GetComponent<MultiplayerRoomPlayer>().playerRole;
             return true;
         }
 
@@ -319,72 +298,116 @@ namespace Wugou.Multiplayer
         /// <summary>
         /// 加载脚本
         /// </summary>
-        /// <param name="content"></param>
+        /// <param name="packagePath"></param>
         /// <param name="onLoaded"></param>
-        protected virtual void LoadMap(string content, System.Action onLoaded = null)
+        protected virtual async void LoadGameMapPackage(string packagePath, System.Action onLoaded = null)
         {
             // loading page, hide when all player ready
-            var loadingPage = uiRootWindow.GetChildWindow<LoadingScenePage>();
-            loadingPage.Show();
-            loadingPage.SetProgress(0);
+            DaemonUI.loadingPage.Show();
+            DaemonUI.loadingPage.SetProgress(0.1f);
+            DaemonUI.loadingPage.UpdateProgressBar(() => {
+                if (GameWorld.loadingSceneOperation != null)
+                {
+                    if (GameWorld.loadingSceneOperation.isDone)
+                    {
+                        return 1.0f;
+                    }
 
-            StartCoroutine(UpdateProgressBar(loadingPage));     // 更新进度
+                    return 0.1f + GameWorld.loadingSceneOperation.progress * 0.9f;
+                }
+
+                return DaemonUI.loadingPage.GetProgress();
+            });     // 更新进度
 
             // 等UI刷新，因为Unity哪怕是异步加载，也可能卡死主线程
-            StartCoroutine(WaitLoadMap(content, onLoaded));
-        }
-
-        /// <summary>
-        /// Unity3D加载场景会卡顿，哪怕是异步加载（大场景），这个时候会阻塞UI和网络
-        /// </summary>
-        /// <param name="content"></param>
-        /// <param name="onLoaded"></param>
-        /// <returns></returns>
-        IEnumerator WaitLoadMap(string content, System.Action onLoaded)
-        {
-            if(mode == NetworkManagerMode.Host)
+            if (mode == NetworkManagerMode.Host)
             {
                 // 服务器等一等，等网络消息都发出去了再响应场景加载，否则客户端收不到消息，会卡在房间页面
                 // 虽然不是太保险，但是缓解了很多,最好还是unity别卡顿，按理来说mirror应该在其他线程发送的消息，不会受Unity主线程影响，应该等一帧就可以了。。。
-                yield return null;
-                yield return null;
-                yield return null;
+                await new YieldInstructionAwaiter(null);
+                await new YieldInstructionAwaiter(null);
+                await new YieldInstructionAwaiter(null);
             }
 
-            GameWorld.LoadMap(content, () =>
+            if (string.IsNullOrEmpty(packagePath))
             {
-                onLoaded?.Invoke();
-            });
-        }
+                Logger.Error($"Empty GameMap....");
+                return;
+            }
 
-        IEnumerator UpdateProgressBar(LoadingScenePage page)
-        {
-            bool bUpdateProgress = true;
-            while (bUpdateProgress)
+            // set server flag to stop processing messages while changing scenes
+            // it will be re-enabled in FinishLoadScene.
+            NetworkServer.isLoadingScene = true;
+
+            var succ = await GameWorld.LoadGameMapPackage(packagePath, LoadSceneMode.Single);
+            if (succ == GameWorld.Error.kSuccess)
             {
-                if (AssetBundleSceneManager.activeAsyncOperation != null)
+                // 模拟Mirror中对Scene GameObject的处理，参照NetworkIdentity.SetSceneIdSceneHashPartInternal
+                for (int i = 0; i < GameWorld.gameEntities.Count; i++)
                 {
-                    float p = AssetBundleSceneManager.activeAsyncOperation.progress;
-                    page.SetProgress(p);
-
-                    if (AssetBundleSceneManager.activeAsyncOperation.isDone || p > 0.9999999f)
+                    var entity = GameWorld.gameEntities[i];
+                    var identity = entity.GetComponent<NetworkIdentity>();
+                    if (identity)
                     {
-                        bUpdateProgress = false;
+                        // 使用GameEntity的id作为SceneID
+                        var sceneId = (ulong)entity.id;
+
+                        string scenePath = GameWorld.activeScene.name.ToLower();
+
+                        // get deterministic scene hash
+                        uint pathHash = (uint)scenePath.GetStableHashCode();
+
+                        // shift hash from 0x000000FFFFFFFF to 0xFFFFFFFF00000000
+                        ulong shiftedHash = (ulong)pathHash << 32;
+
+                        // OR into scene id
+                        sceneId = (sceneId & 0xFFFFFFFF) | shiftedHash;
+
+                        identity.sceneId = sceneId;
+                        identity.gameObject.SetActive(false);
                     }
+
                 }
 
-                yield return null;
+                // attention: mirror
+                FinishLoadScene();
+
+                // 发送加载完成消息，所有人加载完成后由服务端发送开始消息
+                NetworkClient.Send<LoadedGameSceneMessage>(new LoadedGameSceneMessage());
+
+                DaemonUI.loadingPage.SetProgress(1.0f);
+                DaemonUI.loadingPage.SetText("等待其他玩家");
+
+                // 注意是异步
+                Utils.DoAsync(async () =>
+                {
+                    if (mode == NetworkManagerMode.Host)
+                    {
+                        // 等待一段时间
+                        await new YieldInstructionAwaiter(new WaitForSeconds(20));
+                        if (!isSendReadyGo)
+                        {
+                            isSendReadyGo = true;
+                            NetworkServer.SendToAll<AllLoadedSceneMessage>(new AllLoadedSceneMessage() { startTime = NetworkTime.time });
+                        }
+                    }
+                });
+
+                onLoaded?.Invoke();
             }
+            else
+            {
+                StopGameplay();
+            }
+
         }
+
 
         /// <summary>
         /// 卸载脚本（同时会卸载场景）
         /// </summary>
         public virtual void UnloadGameMap()
         {
-            // 清理天气系统
-            WeatherSystem.Clear();
-
             // reset
             GameWorld.UnloadGameMap();
         }
@@ -393,27 +416,32 @@ namespace Wugou.Multiplayer
         /// 处理脚本消息
         /// </summary>
         /// <param name="message"></param>
-        void OnReceiveGameMapInternal(GameMapMessage message)
+        void OnReceiveGameMapInternal(GameMapPackageMessage message)
         {
-            Debug.Log("Receive game map:" + message.content);
+            Logger.DebugInfo("Receive game map:" + message.content.Length);
 
-            if (string.IsNullOrEmpty(message.content))
+            if (string.IsNullOrEmpty(message.name))
             {
-                Wugou.Logger.Error("GameMapMessage error.");
                 return;
             }
 
-            GameMap map = new GameMap();
-            map.Parse(message.content);
-            if (string.IsNullOrEmpty(map.name))
-            {
-                Wugou.Logger.Error("GameMapMessage error.");
-                return;
-            }
+            // 客户端写入
+            //if (mode == NetworkManagerMode.ClientOnly)   
+            //{
+            //    var dst = $"{Gameplay.downloadGameMapsPath}/{message.name}";
+            //    Directory.CreateDirectory(Gameplay.downloadGameMapsPath);
+            //    File.WriteAllBytes(dst, message.content);
 
-            // 当前游戏地图
-            gameMap = map;
-            OnGameMapChanged(map);
+            //    // 当前游戏地图
+            //    gameMapPackagePath = dst;
+            //}
+            //else
+            //{
+            //    // 当前游戏地图
+            //    gameMapPackagePath = hostGameMapPackage.path;
+            //}
+
+            OnGameMapChanged(gameMapPackage.name);
         }
 
         /// <summary>
@@ -422,67 +450,28 @@ namespace Wugou.Multiplayer
         private bool isSendReadyGo { get; set; } = false;
         void OnStartGameInternal(StartGameMessage message)
         {
-            // set server flag to stop processing messages while changing scenes
-            // it will be re-enabled in FinishLoadScene.
-            NetworkServer.isLoadingScene = true;
+            Gameplay.isGaming = true;
+            // 
+            gameMapSync.Shutdown();
 
-            LoadMap(gameMap.rawContent, () =>
+            LoadGameMapPackage(gameMapPackage.path, () =>
             {
-                // attention: mirror
-                FinishLoadScene();
-
-                if (mode == NetworkManagerMode.Host)
-                {
-                    // 对有网络同步需求的对象特殊处理
-                    for(int i=0;i<GameWorld.gameEntities.Count;i++)
-                    {
-                        var dd = GameWorld.gameEntities[i];
-                        var comp = GameWorld.gameEntities[i].GetComponent<GameEntityNetworkify>();
-                        if (comp != null)
-                        {
-                            comp.NetworkInstantiate();
-                        }
-                    }
-                }
-
-                NetworkClient.Send<LoadedGameSceneMessage>(new LoadedGameSceneMessage());
-                uiRootWindow.GetChildWindow<LoadingScenePage>().SetProgress(1.0f);
-                uiRootWindow.GetChildWindow<LoadingScenePage>().SetText("等待其他玩家");
-                if(mode == NetworkManagerMode.Host)
-                {
-                    // 最多等待20秒
-                    StartCoroutine(WaitingSetTimeAndStart(25));
-                }
-
-                OnStartGameplay();
                 isStartedGameplay = true;
             });
-        }
-
-        protected IEnumerator WaitingSetTimeAndStart(float time)
-        {
-            yield return new WaitForSeconds(time);
-
-            if (!isSendReadyGo)
-            {
-                isSendReadyGo = true;
-                NetworkServer.SendToAll<ReadyGoMessage>(new ReadyGoMessage() { startTime = NetworkTime.time});
-            }
-
         }
 
         public int loadedGameSceneCount { get; private set; } = 0;
         void OnLoadedGameSceneInternal(NetworkConnectionToClient conn, LoadedGameSceneMessage message)
         {
             loadedGameSceneCount++;
-            if (!isSendReadyGo && loadedGameSceneCount == roomplayers.Count)
+            if (!isSendReadyGo && loadedGameSceneCount == MultiplayerRoomPlayer.allPlayers.Count)
             {
                 isSendReadyGo = true;
-                NetworkServer.SendToAll<ReadyGoMessage>(new ReadyGoMessage() { startTime = NetworkTime.time });
+                NetworkServer.SendToAll<AllLoadedSceneMessage>(new AllLoadedSceneMessage() { startTime = NetworkTime.time });
             }
         }
 
-        void OnReadyGoInternal(ReadyGoMessage message)
+        void OnAllLoadedSceneInternal(AllLoadedSceneMessage message)
         {
             gameStartTime = message.startTime;
 
@@ -506,22 +495,31 @@ namespace Wugou.Multiplayer
             //    yield return new WaitForSeconds(0.5f);
             //}
 
-            //// 结束
-            //if(!MultiplayerGamePlayer.owner)
-            //{
-            //    StopGameplay();
-            //}
-
-            while (!MultiplayerGamePlayer.owner)
+            int times = 3;
+            while (!MultiplayerGamePlayer.owner && times-- > 0)
             {
                 yield return new WaitForSeconds(0.5f);
             }
 
-            uiRootWindow.GetChildWindow<LoadingScenePage>().SetProgress(1.0f);
-            yield return new WaitForSeconds(0.2f);  // 进度条90%突然进入场景有点突兀
-            uiRootWindow.GetChildWindow<LoadingScenePage>().Hide();
-            MultiplayerGamePlayer.owner.ReadyGo();
+            if(MultiplayerGamePlayer.owner)
+            {
+                DaemonUI.loadingPage.SetProgress(1.0f);
+                yield return new WaitForSeconds(0.2f);  // 进度条90%突然进入场景有点突兀
+                DaemonUI.loadingPage.Hide();
 
+                // 加载业务逻辑脚本
+
+
+                // 玩家开始
+                MultiplayerGamePlayer.owner.ReadyGo();
+
+                // 这个时候才是真的开始
+                OnStartGameplay();
+            }
+            else
+            {
+                Logger.Error("MultiplayerGamePlayer.owner is null....");
+            }
         }
 
         #endregion
@@ -540,37 +538,76 @@ namespace Wugou.Multiplayer
             }
 
             // 再次加非游戏场景
-            SceneManager.LoadScene(GamePlay.settings.mainSceneName);
+            SceneManager.LoadScene(Gameplay.settings.networkMainScene);
         }
 
         /// <summary>
         /// 当前Server或Host选择的脚本
         /// </summary>
-        public GameMap selectedGameMap { get; set; }
+        public GameMapPackage gameMapPackage { get; set; }
 
         /// <summary>
-        /// 创建并加入房间
+        /// 用于从服务器下载游戏脚本
         /// </summary>
-        public void CreateRoom(GameMap map)
+        public GameMapSync gameMapSync { get; private set; } = new GameMapSync();
+
+        /// <summary>
+        /// 创建房间
+        /// </summary>
+        /// <param name="package"></param>
+        public bool CreateRoom(GameMapPackage package)
         {
-            selectedGameMap = map;
+            gameMapPackage = package;
 
-            // handle before create room
-            OnCreateRoom();
+            try
+            {
+                StartHost();
 
-            // TODO: fixed
-            GameplayScene = GamePlay.settings.networkMainSceneName;
+                return true;
+            }
+            catch (Exception e)
+            {
+                DaemonUI.makeSurePage.Tips($"创建房间失败！{e.Message}");
 
-            StartHost();
+                return false;
+            }
         }
 
         /// <summary>
         /// 加入房间
         /// </summary>
         /// <param name="room"></param>
-        public void EnterRoom(System.Uri room)
+        public void EnterRoom(MultiplayerServerResponse response)
         {
-            StartClient(room);
+            serverResponse = response;
+
+            // 先查找本地是否有地图
+            var packages = Gameplay.gameMapManager.GetAllNames();
+            long ts = -1;
+            long.TryParse(response.gameMapMd5,out ts);
+            for(int i=0;i<packages.Count;i++)
+            {
+                int pos = packages[i].LastIndexOf('/');
+                var mapName = pos == -1 ? packages[i] : packages[i].Substring(0, pos);
+                if (mapName == response.gameMapPackage)
+                {
+                    var package = Gameplay.gameMapManager.Get(packages[i]);
+                    if(package.gameMap.timestamp == ts)
+                    {
+                        gameMapPackage = package;
+                        break;
+                    }
+                }
+            }
+
+            // 没找到，从服务器下载
+            if(gameMapPackage == null)
+            {
+                //
+                gameMapSync.StartClient(response.uri);
+            }
+
+            StartClient(response.uri);
         }
 
         public void ExitRoom()
@@ -585,18 +622,30 @@ namespace Wugou.Multiplayer
             }
         }
 
-        public virtual void OnCreateRoom()
-        {
-            // 
-        }
-
         /// <summary>
         /// 脚本更换时调用
         /// </summary>
-        /// <param name="map"></param>
-        public virtual void OnGameMapChanged(GameMap map)
+        /// <param name="name"></param>
+        public virtual void OnGameMapChanged(string name)
         {
-            print("in network room");
+            Logger.Info($"Change GameMap to {name}...");
+        }
+
+        /// <summary>
+        /// 预解压GameMap
+        /// </summary>
+        /// <param name="path"></param>
+        public void PreExtractGameMap(string path)
+        {
+            var mapPath = path;
+            var cachePath = $"{Gameplay.gameMapCachePath}";
+            string packageName = Path.GetFileNameWithoutExtension(mapPath);
+            GameMapPackage.Extract($"{mapPath}", cachePath);
+            var packageDir = $"{cachePath}/{packageName}";
+            if (!Directory.Exists(packageDir))
+            {
+                Wugou.Logger.Error($"Extract {mapPath} to {cachePath} fail...");
+            }
         }
 
         /// <summary>
@@ -604,21 +653,24 @@ namespace Wugou.Multiplayer
         /// 1. 开启网络服务；
         /// 2. 加载场景;
         /// </summary>
-        public void StartGameplay(GameMap map)
+        public void StartGameplay(GameMapPackage package)
         {
             if (!(mode == NetworkManagerMode.Host || mode == NetworkManagerMode.ServerOnly))
             {
                 return;
             }
 
-            if (map == null)
+            if (package == null)
             {
                 Logger.Warning($"game map is null..");
                 return;
             }
 
+            // 
+            StopServerDiscovery();
+
             // mirror
-            networkSceneName = map.scene.sceneName;
+            networkSceneName = package.gameMap.scene;
             NetworkServer.SetAllClientsNotReady();
 
             //
@@ -626,9 +678,6 @@ namespace Wugou.Multiplayer
             isSendReadyGo = false;
             // Send Scene message to client to load the game scene
             NetworkServer.SendToAll(new StartGameMessage { });
-
-            // stop discovery
-            StopServerDiscovery();
         }
 
         public void StopGameplay()
@@ -640,6 +689,10 @@ namespace Wugou.Multiplayer
             else if (mode == NetworkManagerMode.ClientOnly)
             {
                 StopClient();
+            }
+            else
+            {
+                Logger.Error($"{mode} not within expectations");
             }
         }
 
@@ -656,74 +709,20 @@ namespace Wugou.Multiplayer
         protected virtual void OnStopGameplay()
         {
             // 收集玩家信息，记录
-            foreach(var v in gameplayers)
+            foreach(var v in MultiplayerGamePlayer.allPlayers)
             {
                 UpdateGameplayerSnapshot(v.Value);
             }
 
-            var gameStats = GamePlay.lastGameStats;
-            gameStats.duration = Time.realtimeSinceStartup - gameStats.duration;
+            SaveGameStat();
 
-            // 写记录
-            GamePlay.gameStatsManager.AddGameStats(gameStats);
-
+            // UI清理
+            UIRootWindow.Release();
         }
 
-        /// <summary>
-        /// 记录进入房间的玩家 
-        /// </summary>
-        /// <param name="roomPlayer"></param>
-        public void AddRoomPlayer(MultiplayerGameRoomPlayer roomPlayer)
+        protected virtual void SaveGameStat()
         {
-            roomplayers[roomPlayer.playerId] = roomPlayer;
-        }
-
-        /// <summary>
-        /// 用于删除下线的玩家
-        /// </summary>
-        /// <param name="roomPlayer"></param>
-        public void RemoveRoomPlayer(MultiplayerGameRoomPlayer roomPlayer)
-        {
-            if (roomplayers.ContainsKey(roomPlayer.playerId))
-            {
-                roomplayers.Remove(roomPlayer.playerId);
-            }
-        }
-
-        /// <summary>
-        /// 记录进入游戏的玩家
-        /// </summary>
-        public void AddGamePlayer(MultiplayerGamePlayer player)
-        {
-            gameplayers[player.playerId] = player;
-        }
-
-        /// <summary>
-        /// 用于删除下线的玩家
-        /// </summary>
-        /// <param name="player"></param>
-        public void RemoveGamePlayer(MultiplayerGamePlayer player)
-        {
-            if (gameplayers.ContainsKey(player.playerId))
-            {
-                gameplayers.Remove(player.playerId);
-            }
-        }
-
-        /// <summary>
-        /// 获取玩家实例
-        /// </summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        public MultiplayerGamePlayer GetGameplayer(int id)
-        {
-            if (gameplayers.ContainsKey(id))
-            {
-                return gameplayers[id];
-            }
-
-            Wugou.Logger.Error($"Player id {id} not exist. Maybe not login or connect timeout(auto disconnect).");
-            return null;
+            throw new NotImplementedException();
         }
 
         /// <summary>
@@ -734,24 +733,29 @@ namespace Wugou.Multiplayer
 
         }
 
-        /// <summary>
-        /// 为玩家分配ID
-        /// </summary>
-        /// <returns></returns>
+        private static int sPlayerIdIndex = 0;      // 用于分配player id
         public int AllocatePlayerID()
         {
-            // id 分配
-            int id = 0;
-            var players = MultiplayerGameManager.instance.roomplayers;
+            return sPlayerIdIndex++;
+        }
+
+        /// <summary>
+        /// 为玩家分配房间中的位置, 只在服务端运行
+        /// </summary>
+        /// <returns></returns>
+        public int AllocateRoomSeat()
+        {
+            // 查找最小的可用的位置
             HashSet<int> ids = new HashSet<int>();
-            foreach (var p in players.Values)
+            foreach (var p in MultiplayerRoomPlayer.allPlayers.Values)
             {
-                if (p && p.playerId >= 0)
+                if (p && p.roomSeat >= 0)
                 {
-                    ids.Add(p.playerId);
+                    ids.Add(p.roomSeat);
                 }
             };
 
+            int id = 0;
             // 寻找最小的可用id，用于在房间中的玩家列表
             while (ids.Contains(id))
             {
@@ -768,21 +772,211 @@ namespace Wugou.Multiplayer
         public bool isDiscoveringServer { get; private set; } = false;
         public virtual void AdvertiseServer()
         {
-            GetComponent<MultiplayerNetworkDiscovery>().AdvertiseServer();
+            GetComponent<MultiplayerNetworkDiscovery>()?.AdvertiseServer();
         }
 
         public virtual void StartServerDiscovery()
         {
-            GetComponent<MultiplayerNetworkDiscovery>().StartDiscovery();
+            GetComponent<MultiplayerNetworkDiscovery>()?.StartDiscovery();
             isDiscoveringServer = true;
         }
 
         public virtual void StopServerDiscovery()
         {
-            GetComponent<MultiplayerNetworkDiscovery>().StopDiscovery();
+            GetComponent<MultiplayerNetworkDiscovery>()?.StopDiscovery();
             isDiscoveringServer = false;
         }
 
         #endregion
+    }
+
+    /// <summary>
+    /// 用于同步服务器和客户端间的游戏脚本
+    /// 1.借鉴Mirror discovery server代码, 实现客户端向服务器下载脚本，注意NetworkReaderPooled中的Reader的实现，如果不继承NetworkMessage，则需要自定义reader；
+    /// 2.使用UDP的方案最终放弃了，因为下载的脚本带资源，可能很大，这就需要切片，感觉麻烦；
+    /// 3.同一个思路改为使用tcp，不想那么复杂了
+    /// </summary>
+    public class GameMapSync
+    {  
+        private Thread serverThread_ = null;
+        private Thread clientThread_ = null;
+
+        private int gameMapServerPort = 49999;
+
+        public void StartServer()
+        {
+            Shutdown();
+
+            // Setup port -- may throw exception
+
+            serverThread_ = new Thread(async () =>
+            {
+                TcpListener tcpListener = null;
+                try
+                {
+                    tcpListener = new TcpListener(IPAddress.Any, gameMapServerPort);
+                    tcpListener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                    tcpListener.Start();
+
+                    while (true)
+                    {
+                        TcpClient tcpClient = await tcpListener.AcceptTcpClientAsync();
+                        if (tcpClient.Connected)
+                        {
+                            NetworkStream stream = tcpClient.GetStream();
+
+                            string fullPath = MultiplayerGameManager.instance.gameMapPackage.path;
+                            string fileName = Path.GetFileName(fullPath);
+                            byte[] fileNameByte = Encoding.Unicode.GetBytes(fileName);
+                            byte[] fileNameLengthForValueByte = Encoding.Unicode.GetBytes(fileNameByte.Length.ToString("D11"));
+                            byte[] fileAttributeByte = new byte[fileNameByte.Length + fileNameLengthForValueByte.Length];
+
+                            fileNameLengthForValueByte.CopyTo(fileAttributeByte, 0);  //文件名字符流的长度的字符流排在前面。
+                            fileNameByte.CopyTo(fileAttributeByte, fileNameLengthForValueByte.Length);  //紧接着文件名的字符流
+
+                            stream.Write(fileAttributeByte, 0, fileAttributeByte.Length);
+
+                            using (var fileStream = new FileStream(fullPath, FileMode.Open, FileAccess.Read))
+                            {
+                                int fileReadSize = 0;
+                                long fileLength = 0;
+                                while (fileLength < fileStream.Length)
+                                {
+                                    byte[] buffer = new byte[2048];
+                                    fileReadSize = fileStream.Read(buffer, 0, buffer.Length);
+                                    stream.Write(buffer, 0, fileReadSize);
+                                    fileLength += fileReadSize;
+
+                                }
+                                fileStream.Flush();
+                            }
+                            stream.Flush();
+                            stream.Close();
+                        }
+                    }
+
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex);
+                }
+                finally
+                {
+                    tcpListener?.Stop();
+                }
+
+            });
+            serverThread_.IsBackground = true;
+            serverThread_.Start();
+        }
+
+        /// <summary>
+        /// Start Active Discovery
+        /// </summary>
+        public void StartClient(Uri server)
+        {
+            Shutdown();
+
+            try
+            {
+                // Setup port
+                clientThread_ = new Thread(() =>
+                {
+                    using (TcpClient tcpClient = new TcpClient())
+                    {
+                        try
+                        {
+                            tcpClient.Connect(server.Host, gameMapServerPort);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error(ex);
+
+                        }
+
+                        if (tcpClient.Connected)
+                        {
+                            NetworkStream stream = tcpClient.GetStream();
+                            if (stream != null)
+                            {
+
+                                byte[] fileNameLengthForValueByte = Encoding.Unicode.GetBytes((256).ToString("D11"));
+                                byte[] fileNameLengByte = new byte[1024];
+                                int fileNameLengthSize = stream.Read(fileNameLengByte, 0, fileNameLengthForValueByte.Length);
+                                string fileNameLength = Encoding.Unicode.GetString(fileNameLengByte, 0, fileNameLengthSize);
+                                Logger.DebugInfo("文件名字符流的长度为：" + fileNameLength);
+
+                                int fileNameLengthNum = Convert.ToInt32(fileNameLength);
+                                byte[] fileNameByte = new byte[fileNameLengthNum];
+
+                                int fileNameSize = stream.Read(fileNameByte, 0, fileNameLengthNum);
+                                string fileName = Encoding.Unicode.GetString(fileNameByte, 0, fileNameSize);
+                                Logger.DebugInfo("文件名为：" + fileName);
+
+                                string dirPath = Gameplay.downloadGameMapsPath;
+                                string rcvFile = dirPath + "/" + fileName;
+                                using (FileStream fileStream = new FileStream(rcvFile, FileMode.Create, FileAccess.Write))
+                                {
+                                    int fileReadSize = 0;
+                                    byte[] buffer = new byte[2048];
+                                    while ((fileReadSize = stream.Read(buffer, 0, buffer.Length)) > 0)
+                                    {
+                                        fileStream.Write(buffer, 0, fileReadSize);
+                                    }
+
+                                    Logger.DebugInfo("接收成功");
+
+                                    MultiplayerGameManager.instance.gameMapPackage = new GameMapPackage(rcvFile);
+                                }
+                                stream.Flush();
+                                stream.Close();
+                            }
+                        }
+                    }
+
+                });
+                clientThread_.IsBackground = true;
+                clientThread_.Start();
+
+            }
+            catch (Exception)
+            {
+                // Free the port if we took it
+                //Debug.LogError("NetworkDiscoveryBase StartDiscovery Exception");
+                Shutdown();
+                throw;
+            }
+        }
+
+        public void Shutdown()
+        {
+            if (serverThread_ != null)
+            {
+                try
+                {
+                    serverThread_.Abort();
+                }
+                catch (Exception)
+                {
+                    // it is just close, swallow the error
+                }
+
+                serverThread_ = null;
+            }
+
+            if (clientThread_ != null)
+            {
+                try
+                {
+                    clientThread_.Abort();
+                }
+                catch (Exception)
+                {
+                    // it is just close, swallow the error
+                }
+
+                clientThread_ = null;
+            }
+        }
     }
 }

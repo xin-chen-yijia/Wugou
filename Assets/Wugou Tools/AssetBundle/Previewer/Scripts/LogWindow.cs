@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Wugou.AssetbundlePreviewer
+namespace Wugou.Examples.AssetbundlePreviewer
 {
     public class LogWindow : MonoBehaviour
     {

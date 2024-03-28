@@ -1,71 +1,77 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Mirror;
+using System.Threading.Tasks;
+using UnityEngine.EventSystems;
 
 namespace Wugou.Multiplayer
 {
-    using Mirror;
-    using System.Threading.Tasks;
 
-    public class MultiplayerGamePlayer : NetworkBehaviour
+    public class MultiplayerGamePlayer : MultiplayerGameComponent
     {
         /// <summary>
         /// 单例
         /// </summary>
         public static MultiplayerGamePlayer owner;
 
-        [SyncVar(hook = nameof(SetPlayerName))]
-        public string playerName;
+        [SyncVar(hook = nameof(PlayerNameChanged))]
+        public string playerName="";
 
         [SyncVar]
         public int playerId;
 
-        [SyncVar(hook = nameof(SetPlayerRole))]
+        [SyncVar(hook = nameof(PlayerRoleChanged))]
         public int playerRole;
 
-        public GameObject visualParent;        // 用于Mirror组件同步角度
-        public GameObject visualObject { get; protected set; } // 从assetbundle中加载的角色模型
+        //
+        protected Camera mainCam;
+        public float maxSelectDistance = 100;
 
         /// <summary>
-        /// 用加载的动画
+        /// 记录当前玩家
         /// </summary>
-        public Animator animator => visualObject.GetComponent<Animator>();
+        public static Dictionary<int, MultiplayerGamePlayer> allPlayers { get; private set; } = new Dictionary<int, MultiplayerGamePlayer>();
 
-        protected virtual void SetPlayerName(string oldName, string newName)
+        /// <summary>
+        /// 获取玩家实例
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        public static MultiplayerGamePlayer Get(int id)
+        {
+            if (allPlayers.ContainsKey(id))
+            {
+                return allPlayers[id];
+            }
+
+            Wugou.Logger.Error($"Player id {id} not exist. Maybe not login or connect timeout(auto disconnect).");
+            return null;
+        }
+
+        protected virtual void PlayerNameChanged(string oldName, string newName)
         {
             name = newName;
         }
 
-        protected virtual void SetPlayerRole(int oldRole, int newRole) 
+        protected virtual void PlayerRoleChanged(int oldRole, int newRole) 
         { 
             
         }
 
-        /// <summary>
-        /// 开始游戏
-        /// </summary>
-        public virtual void ReadyGo()
-        {
-        }
-
-        public override async void OnStartClient()
+        public override void OnStartClient()
         {
             base.OnStartClient();
 
             // 记录
-            MultiplayerGameManager.instance.AddGamePlayer(this);
-
-            // 加载模型
-            visualObject = await InstantiateVisualModel();
-
-            OnInstantiateVisualModel();
+            allPlayers[this.playerId] = this;
         }
 
         public override void OnStopClient()
         {
             base.OnStopClient();
 
-            MultiplayerGameManager.instance.UpdateGameplayerSnapshot(this);
+            MultiplayerGameManager.instance?.UpdateGameplayerSnapshot(this);
         }
 
         public override void OnStartLocalPlayer()
@@ -74,6 +80,7 @@ namespace Wugou.Multiplayer
             base.OnStartLocalPlayer();
 
             owner = this;
+            mainCam = Camera.current;
         }
 
         public override void OnStopLocalPlayer()
@@ -84,64 +91,59 @@ namespace Wugou.Multiplayer
         }
 
         /// <summary>
-        /// 获取角色模型在assetbundle中的名称
+        /// StartGame
+        ///    Load GameScene
+        ///        Wait others loaded
+        ///             ReadyGo
+        /// 用于客户端处理正式开始游戏的逻辑，客户端加载完场景后调用
         /// </summary>
-        /// <returns></returns>
-        /// <exception cref="System.Exception"></exception>
-        public virtual string GetVisualAssetName()
+        public virtual void ReadyGo()
         {
-            throw new System.Exception("Not implement GetVisualAssetName..");
         }
 
         /// <summary>
-        /// 实例化主AB包中的模型
+        /// 在场景中实例化GameEntity，主要用于多人网络环境下
         /// </summary>
-        /// <param name="assetName"></param>
-        /// <param name="pos"></param>
-        /// <param name="quaternion"></param>
-        protected async void InstantiateInternal(string assetName, Vector3 pos, Quaternion quaternion, string instantiateName="")
+        /// <param name="info"></param>
+        public async void InstantiateGameEntity(InstantiateGameEntityParams info)
         {
-            var loader = await AssetBundleAssetLoader.GetOrCreate(GamePlay.settings.mainAssetbundle);
-            var assetPrefab = await loader.LoadAssetAsync<GameObject>(assetName);
-            var visualObject = Instantiate<GameObject>(assetPrefab, Vector3.zero, Quaternion.identity);
-            visualObject.transform.position = pos;
-            visualObject.transform.rotation = quaternion;
-            visualObject.name = instantiateName;
+            var entity = GameEntityManager.CreateGameEntity(info.assetName, info.prototype);
+            await entity.InstantiateBody();
+            entity.id = info.entityID;
+            entity.position = info.pos;
+            entity.rotation = info.quaternion;
+            entity.name = info.instantiateName;
+            GameWorld.AddExistGameEntity(entity);
         }
 
         /// <summary>
-        /// 实例化角色模型
+        /// 删除GameEntity,主要用于多人网络环境下
         /// </summary>
-        protected virtual async Task<GameObject> InstantiateVisualModel()
+        /// <param name="entityID"></param>
+        public void DestroyGameEntity(int entityID)
         {
-            string visualizeAssetName = GetVisualAssetName(); 
-            var loader = await AssetBundleAssetLoader.GetOrCreate(GamePlay.settings.mainAssetbundle);
-            var soilderPrefab  = await loader.LoadAssetAsync<GameObject>(visualizeAssetName);
-            var visualObject = Instantiate<GameObject>(soilderPrefab, Vector3.zero, Quaternion.identity, visualParent.transform);
-            visualObject.transform.localPosition = Vector3.zero;
-            visualObject.transform.localRotation = Quaternion.identity;
-
-            return visualObject;
-        }
-
-        /// <summary>
-        /// 在实例化模型后调用
-        /// </summary>
-        protected virtual void OnInstantiateVisualModel()
-        {
-
+            var entity = GameWorld.GetGameEntity(entityID);
+            if (entity)
+            {
+                GameWorld.DestroyGameEntity(entity);
+            }
+            else
+            {
+                Wugou.Logger.Error($"Not found GameEntity： {entityID}");
+            }
         }
 
         #region Mirror RPC
+
         /// <summary>
         /// 发送给指定的玩家
         /// </summary>
-        /// <param name="targetPlayerId"></param>
+        /// <param name="playerId"></param>
         /// <param name="message"></param>
         [Command]
-        public void CmdSendMessageToPlayer(int targetPlayerId, string message)
+        public void CmdSendMessageToPlayer(int playerId, string message)
         {
-            var netPlayer = MultiplayerGameManager.instance.GetGameplayer(targetPlayerId);
+            var netPlayer = Get(playerId);
             netPlayer.TargetSendMessageToPlayer(netPlayer.GetComponent<NetworkIdentity>().connectionToClient, playerName, message);
         }
 
@@ -178,121 +180,6 @@ namespace Wugou.Multiplayer
         }
 
         /// <summary>
-        /// 查找物体
-        /// </summary>
-        /// <param name="path">'/'开头代表是全局查找，某则是在本物体下查找</param>
-        /// <returns></returns>
-        private GameObject GetGameObjectInternal(string path)
-        {
-            GameObject obj = null;
-
-            if (path.StartsWith("/"))
-            {
-                obj = GameObject.Find(path.Substring(1));
-            }
-            else
-            {
-                var t = transform.Find(path);
-                obj = t ? t.gameObject : null;
-            }
-
-            if (!obj)
-            {
-                Wugou.Logger.Error($"Can't find GameObject {path}");
-            }
-            return obj;
-        }
-
-        /// <summary>
-        /// 控制显示和隐藏物体
-        /// </summary>
-        /// <param name="path">'/'开头代表是全局查找，某则是在本物体下查找</param>
-        /// <param name="active"></param>
-        [Command]
-        public void CmdSetGameObjectActive(string path, bool active)
-        {
-            if (string.IsNullOrEmpty(path))
-            {
-                return;
-            }
-
-            RpcSetGameObjectActive(path, active);
-        }
-
-        [ClientRpc]
-        private void RpcSetGameObjectActive(string path, bool active)
-        {
-            var obj = GetGameObjectInternal(path);
-            obj.SetActive(active);
-        }
-
-        [Command]
-        public void CmdSetGameObjectTransform(string path, Vector3 position,  Quaternion rotation, Space space)
-        {
-            RpcSetGameObjectTransform(path, position, rotation, space);
-        }
-
-        [ClientRpc]
-        public void RpcSetGameObjectTransform(string path, Vector3 position, Quaternion rotation, Space space) 
-        {
-            var obj = GetGameObjectInternal(path);
-            if(space == Space.World)
-            {
-                obj.transform.position = position;
-                obj.transform.rotation = rotation;
-            }
-            else
-            {
-                obj.transform.localPosition = position;
-                obj.transform.localRotation = rotation;
-            }
-        }
-
-        /// <summary>
-        /// 播放粒子特效
-        /// </summary>
-        /// <param name="path"></param>
-        /// <param name="play"></param>
-        [Command]
-        public void CmdPlayeParticle(string path, bool play)
-        {
-            RpcPlayParticle(path, play);
-        }
-
-        [ClientRpc]
-        private void RpcPlayParticle(string path, bool play)
-        {
-            var obj = GetGameObjectInternal(path);
-            if (obj && obj.GetComponent<ParticleSystem>())
-            {
-                if (play)
-                {
-                    obj.GetComponent<ParticleSystem>().Play();
-                }
-                else
-                {
-                    obj.GetComponent<ParticleSystem>().Stop();
-                }
-            }
-            else
-            {
-                Wugou.Logger.Error($"Can't find GameObject or no particle system on: {path}");
-            }
-        }
-
-        [Command]
-        public void CmdInstantiateWithAssetName(string assetName, Vector3 pos, Quaternion quaternion, string instantiateName)
-        {
-            RpcInstantiateWithName(assetName, pos, quaternion, instantiateName);
-        }
-
-        [ClientRpc]
-        private void RpcInstantiateWithName(string assetName, Vector3 pos, Quaternion quaternion, string instantiateName)
-        {
-            InstantiateInternal(assetName, pos, quaternion, instantiateName);
-        }
-
-        /// <summary>
         /// 在其他实例上隐藏自身
         /// </summary>
         [Command]
@@ -311,7 +198,7 @@ namespace Wugou.Multiplayer
                     v.enabled = false;
                 }
 
-                foreach (var v in GetComponentsInChildren<Renderer>())
+                foreach(var v in GetComponentsInChildren<Collider>())
                 {
                     v.enabled = false;
                 }
@@ -320,31 +207,94 @@ namespace Wugou.Multiplayer
         }
 
         /// <summary>
-        /// cmd
+        /// 实例化有网络组件的物体，第一步
         /// </summary>
-        /// <param name="objName"></param>
+        /// <param name="info"></param>
         [Command]
-        public void CmdDestroyObject(string objName)
+        public void CmdInstantiateNetworkGameEntity(InstantiateGameEntityParams info)
         {
-            RpcDestroyObject(objName);
+            var prefabs = MultiplayerGameManager.instance.spawnPrefabs;
+            for (int i = 0; i < prefabs.Count; ++i)
+            {
+                if (prefabs[i].name == info.prototype)
+                {
+                    GameObject go = Instantiate<GameObject>(prefabs[i]);
+                    go.name = info.instantiateName;
+                    go.transform.position = info.pos;
+                    go.transform.rotation = info.quaternion;
+
+                    NetworkServer.Spawn(go);
+
+                    RpcInstantiateNetworkGameEntityBody(go.GetComponent<NetworkIdentity>().netId, info);
+                    return;
+                }
+            }
+
+            Wugou.Logger.Error($"{info.prototype} not spawnable...");
         }
 
+        /// <summary>
+        /// 实例化有网络组件物体的第二步，查找到GameEntity，实例化Body
+        /// </summary>
+        /// <param name="info"></param>
         [ClientRpc]
-        private void RpcDestroyObject(string objName)
+        public async void RpcInstantiateNetworkGameEntityBody(uint netId, InstantiateGameEntityParams info)
         {
-            var go = GetGameObjectInternal(objName);
-            if(go != null)
+            var netObjs = GameObject.FindObjectsOfType<NetworkIdentity>();
+            for (int i = 0; i < netObjs.Length; i++)
             {
-                GameObject.Destroy(go);
+                if (netObjs[i].netId == netId)
+                {
+                    var go = netObjs[i].gameObject;
+                    go.name = info.instantiateName;
+                    var entity = go.GetComponent<GameEntity>();
+                    entity.id = info.entityID;
+                    entity.asset = info.assetName;
+                    entity.prototype = info.prototype;
+
+                    await entity.InstantiateBody();
+
+                    GameWorld.AddExistGameEntity(entity);
+
+                    return;
+                }
+
             }
+
+            Wugou.Logger.Error($"Not found NetworkIdentity: {netId}..");
+
+        }
+
+        [Command]
+        public void CmdRemoveGameEntity(GameObject go)
+        {
+            // 暂时没有缓存的需求，先用删除
+            //NetworkServer.UnSpawn(go);
+            NetworkServer.Destroy(go);
         }
 
         #endregion
 
-        private void OnDestroy()
+        protected virtual void OnDestroy()
         {
             //
-            MultiplayerGameManager.instance.RemoveGamePlayer(this);
+            if (allPlayers.ContainsKey(playerId))
+            {
+                allPlayers.Remove(playerId);
+            }
         }
+    }
+
+    /// <summary>
+    /// 用于实例化GameEntity的参数
+    /// </summary>
+    public struct InstantiateGameEntityParams
+    {
+        public int entityID;
+        public string assetName;
+        public string prototype;
+        public Vector3 pos;
+        public Quaternion quaternion;
+        public string instantiateName;
     }
 }

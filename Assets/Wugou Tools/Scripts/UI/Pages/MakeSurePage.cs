@@ -16,8 +16,6 @@ namespace Wugou.UI
 
         public Button okButton2_;
 
-        private bool initialized_ = false;
-
         // Start is called before the first frame update
         void Start()
         {
@@ -39,18 +37,18 @@ namespace Wugou.UI
 
             okButton1_.onClick.RemoveAllListeners();
             okButton1_.GetComponentInChildren<TMP_Text>().text = okLabel;
-            okButton1_.onClick.AddListener(() => { okAction?.Invoke(); Hide(); });
+            okButton1_.onClick.AddListener(() => { Hide(); okAction?.Invoke(); });
             okButton1_.gameObject.SetActive(true);
 
             cancelButton1_.onClick.RemoveAllListeners();
             cancelButton1_.GetComponentInChildren<TMP_Text>().text = cancelLabel;
-            cancelButton1_.onClick.AddListener(() => { cancelAction?.Invoke(); Hide(); });
+            cancelButton1_.onClick.AddListener(() => { Hide(); cancelAction?.Invoke();  });
             cancelButton1_.gameObject.SetActive(true);
 
             Show(true);
         }
 
-        public void ShowTips(string content, System.Action onOk = null)
+        public void Tips(string content, System.Action onOk = null)
         {
             content_.text = content;
 
@@ -59,7 +57,7 @@ namespace Wugou.UI
 
             okButton2_.onClick.RemoveAllListeners();
             okButton2_.GetComponentInChildren<TMP_Text>().text = "È·¶¨";
-            okButton2_.onClick.AddListener(() => { onOk?.Invoke(); Hide(); });
+            okButton2_.onClick.AddListener(() => { Hide(); onOk?.Invoke(); });
             okButton2_.gameObject.SetActive(true);
 
             Show(true);

@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEditor;
 using System.IO;
 using Newtonsoft.Json;
+using System;
 
 namespace Wugou.Assetbundle
 {
@@ -13,10 +14,34 @@ namespace Wugou.Assetbundle
 
         const string sceneSuffixStr_ = ".unity";
 
-        public static List<string> plugins { get; set; } = new List<string>();
+        /// <summary>
+        /// assign assetbundle name to asset
+        /// </summary>
+        /// <param name="assetPath"></param>
+        /// <param name="assetBundleName"></param>
+        /// <param name="variantName"></param>
+        public static void AssignAssetBunleName(string assetPath, string assetBundleName, string variantName)
+        {
+            if (string.IsNullOrEmpty(assetPath))
+            {
+                return;
+            }
+            if (assetPath.EndsWith(".cs"))  // 脚本不能导出
+            {
+                return;
+            }
+            AssetImporter ai = AssetImporter.GetAtPath(assetPath);
+            if(ai != null)
+            {
+                string tmpName = assetBundleName;
+                if (assetPath.EndsWith(sceneSuffixStr_))    //scene can't pack with assets
+                {
+                    tmpName = assetBundleName + "_scene";
+                }
+                ai.SetAssetBundleNameAndVariant(tmpName, variantName);
+            }
 
-        public static bool isBuildVRAssets =  false;
-
+        }
 
         /// <summary>
         /// name assetbundles in specified folder
@@ -52,7 +77,7 @@ namespace Wugou.Assetbundle
         /// <summary>
         /// 重置指定路径的assetbundle命名
         /// </summary>
-        public static void ResetAssetBundleNames()
+        public static void ResetAllAssetBundleNames()
         {
             string[] assetBundleNames = AssetDatabase.GetAllAssetBundleNames();
             for (int i = 0; i < assetBundleNames.Length; i++)
@@ -70,11 +95,11 @@ namespace Wugou.Assetbundle
             AssetDatabase.RemoveUnusedAssetBundleNames();
         }
 
-        private static void WriteLaunchInfoToFile(string path)
+        private static void WriteDescriptionToFile(string path)
         {
-            AssetBundleLauchDesc buildInfo = new AssetBundleLauchDesc();
-            buildInfo.version = Application.unityVersion;
-            buildInfo.vrAssets = isBuildVRAssets;
+            AssetBundleDescFile buildInfo = new AssetBundleDescFile();
+            buildInfo.unityVersion = Application.unityVersion;
+            buildInfo.createTime = string.Format("{0}", DateTime.Now.ToLocalTime());
 
             string[] assetBundleNames = AssetDatabase.GetAllAssetBundleNames();
             for (int i = 0; i < assetBundleNames.Length; i++)
@@ -84,15 +109,11 @@ namespace Wugou.Assetbundle
 
                 string[] aFiles = AssetDatabase.GetAssetPathsFromAssetBundle(abContent.assetbundleName);
                 abContent.assets = new List<string>(aFiles);
-
                 buildInfo.contents.Add(abContent);
             }
 
-            // 插件
-            buildInfo.plugins = plugins;
-
             string jsonString = JsonConvert.SerializeObject(buildInfo);
-            File.WriteAllText(Path.Combine(path, AssetBundleAssetLoader.kLauchDescFileName), jsonString);
+            File.WriteAllText($"{path}/{Path.GetFileName(path)}{AssetPackageLoader.kDescFileNameSuffix}", jsonString);
         }
 
         /// <summary>
@@ -119,26 +140,7 @@ namespace Wugou.Assetbundle
         public static void ExcuteBuildAssetbundls(string path, BuildAssetBundleOptions options = BuildAssetBundleOptions.None, BuildTarget target = BuildTarget.StandaloneWindows)
         {
             BuildPipeline.BuildAssetBundles(path, options, target);
-            WriteLaunchInfoToFile(path);
-        }
-
-        private static string[] GetAllABScenesName()
-        {
-            List<string> scenes = new List<string>();
-            foreach (var v in AssetDatabase.GetAllAssetBundleNames())
-            {
-                foreach (var s in AssetDatabase.GetAssetPathsFromAssetBundle(v))
-                {
-                    if (s.EndsWith("unity"))
-                    {
-                        string temp = s.Substring(s.LastIndexOf('/') + 1);
-                        temp = temp.Substring(0, temp.LastIndexOf('.'));
-                        scenes.Add(temp);
-                    }
-                }
-            }
-
-            return scenes.ToArray();
+            WriteDescriptionToFile(path);
         }
     }
 }

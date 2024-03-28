@@ -18,11 +18,11 @@ namespace Wugou.Examples.UI
         public Button backButton;
         public Button okButton;
 
-        public UnityAction<AssetBundleScene> onSelectScene = null;
+        public UnityAction<string> onSelectScene = null;
 
-        private AssetBundleScene selectedScene_;
+        private string selectedScene_;
 
-        Dictionary<AssetBundleSceneCard, GameObject> sceneCards_ = new Dictionary<AssetBundleSceneCard, GameObject>();
+        Dictionary<UnityScene, GameObject> sceneCards_ = new Dictionary<UnityScene, GameObject>();
         Transform tagsParent => transform.Find("Main/Shifting/Tags");
 
         // Start is called before the first frame update
@@ -74,19 +74,15 @@ namespace Wugou.Examples.UI
 
         //}
 
-        public async void SetScenes(List<AssetBundleSceneCard> scenes)
+        public async void SetScenes(List<UnityScene> scenes)
         {
             sceneCards_.Clear();
             float clickTime = -1;
             GameObject lastCheckedObj = null;
-            Utils.FillContent(sceneItemContainer, sceneItemPrefab, scenes, (GameObject go, AssetBundleSceneCard card) =>
+            Utils.FillContent(sceneItemContainer, sceneItemPrefab, scenes, (go, card) =>
             {
                 go.transform.Find("Name/Name").GetComponent<TMP_Text>().text = card.name;
-                Utils.LoadSpriteFromFileWithWebRequest(System.IO.Path.GetFullPath($"{GamePlay.settings.resourcePath}/{card.icon}"), new Vector2(0.5f, 0.5f), (sprite) =>
-                {
-                    go.transform.Find("Icon").GetComponent<Image>().sprite = sprite;
-                });
-
+                ReadAndAssignIcon(go.transform.Find("Icon").GetComponent<Image>(), card.thumbnail);
                 var button = go.transform.Find("Button").GetComponent<Button>();
                 button.onClick.AddListener(() =>
                 {
@@ -122,8 +118,13 @@ namespace Wugou.Examples.UI
 
             // layout的通病，不能及时更新排列
             await new YieldInstructionAwaiter(null);
-            Utils.ResizeContainer(sceneItemContainer);
+            _ = Utils.ResizeContainer(sceneItemContainer);
 
+        }
+
+        private async void ReadAndAssignIcon(Image img,string icon)
+        {
+            img.sprite = await GameAssetDatabase.GetAssetAsync<Sprite>(icon);
         }
     }
 

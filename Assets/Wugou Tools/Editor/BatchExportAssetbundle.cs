@@ -36,7 +36,7 @@ namespace Wugou.Editor
             //File.WriteAllText("d:/a.txt", tt);
 
             // 指定要导出的资源路径
-            AssetbundleExport.AssignAssetBundleNameInFolder(abFolder, abFolder, AssetBundleAssetLoader.kPandaVariantName);
+            AssetbundleExport.AssignAssetBundleNameInFolder(abFolder, abFolder, AssetPackageLoader.kPandaVariantName);
 
             // 构建AB包
             AssetbundleExport.ExcuteBuildAssetbundls(exFolder, BuildAssetBundleOptions.None, BuildTarget.StandaloneWindows64);

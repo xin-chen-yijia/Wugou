@@ -3,34 +3,34 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
+//using UnityEngine.PostProcessing;
+//using UniStorm;
 using System.Threading.Tasks;
 using System.IO;
+using System;
+using Wugou.UI;
+using UnityEditor;
 #if WUGOU_XR
 using Wugou.XR;
 #endif
 
-using Wugou.UI;
-namespace Wugou.AssetbundlePreviewer
+namespace Wugou.Examples.AssetbundlePreviewer
 {
     public class AssetbundlePreviewer : MonoBehaviour
     {
-        public GameObject originCamera;
-
-        // for vr mode
-        public GameObject steamVRObj;
-
-        private string loadedSceneName_ = "";
         private List<GameObject> loadedObjects_ = new List<GameObject>();
 
         public static AssetbundlePreviewer instance;
 
-        public LoadingPage loadingPage;
+        public LoadingScenePage loadingPage;
+
+        public UIRootWindow rootWindow;
 
 
         /// <summary>
         /// assetbundle loader
         /// </summary>
-        public AssetBundleAssetLoader assetbundleLoader { private set; get; } = null;
+        public AssetPackageLoader assetbundleLoader { private set; get; } = null;
 
         private FlyCamera flyCamera_ = null;
 
@@ -38,12 +38,17 @@ namespace Wugou.AssetbundlePreviewer
         private void Awake()
         {
             DontDestroyOnLoad(this);
-            instance = this; ;
+            instance = this;
+
+            // 天气系统
+            //UnistormWeatherSystemConfig.Apply();
         }
 
         // Start is called before the first frame update
         void Start()
         {
+            // 
+            WeatherSystem.Load();
         }
 
         // Update is called once per frame
@@ -55,120 +60,78 @@ namespace Wugou.AssetbundlePreviewer
             }
         }
 
-        private void OnEnable()
-        {
-            SceneManager.sceneLoaded += OnSceneLoaded;
-        }
-
-        private void OnDisable()
-        {
-            SceneManager.sceneLoaded -= OnSceneLoaded;
-        }
-
         private void OnApplicationQuit()
         {
             if (assetbundleLoader != null)
             {
-                assetbundleLoader.UnloadAssetBundle(true);
+                assetbundleLoader.Unload(true);
             }
         }
 
-        public async Task<AssetBundleAssetLoader> LoadAssetbundle(string assetsDir)
+        public async void LoadAssetBundle(string path)
         {
-            // 更新信息
-            if (assetbundleLoader != null)
+            UnloadAssetBundle();
+
+            assetbundleLoader = await AssetPackageLoader.GetOrCreate(path);
+            if(assetbundleLoader == null)
             {
-                assetbundleLoader.UnloadAssetBundle(false);
+                Debug.LogError($"load {path} failed...");
+                return;
+            }
+            List<string> assets = new List<string>();
+            foreach (var asset in assetbundleLoader.GetAllConetents())
+            {
+                // 只加载场景和gameobject
+                if (asset.EndsWith(".unity") || asset.EndsWith(".prefab"))
+                {
+                    assets.Add(asset);
+                }
             }
 
-            assetbundleLoader = await AssetBundleAssetLoader.GetOrCreate(assetsDir);
-            if (assetbundleLoader == null)
+            rootWindow.GetChildWindow<AssetsListPage>().SetAssets(assets);
+            rootWindow.GetChildWindow<AssetsListPage>().Show();
+        }
+
+        public async void LoadScene(string sceneName)
+        {
+            // load scene
+            await assetbundleLoader.LoadAssetBundleAsync(assetbundleLoader.GetAssetBundleByAssetName(sceneName));
+            StartCoroutine(LoadingScene(sceneName));
+
+        }
+
+        public async Task<GameObject> LoadAsset(string path)
+        {
+            try
             {
-                LogWindow.instance.Log("AsyncAssetBundleLoader init failed .... ");
+                // load prefab
+                var assetPfb = await assetbundleLoader.LoadAssetAsync<GameObject>(path);
+                if (!assetPfb)
+                {
+                    LogWindow.instance.Log($"there have no object {path} in assetbundle....");
+                    return null;
+                }
+
+                // 禁用脚本
+                GameObject go = GameObject.Instantiate<GameObject>(assetPfb);
+                foreach (var v in go.GetComponents<MonoBehaviour>())
+                {
+                    v.enabled = false;
+                }
+                loadedObjects_.Add(go);
+
+                go.transform.position = Camera.main.transform.position + Camera.main.transform.forward * 15f;
+
+                rootWindow.GetChildWindow<HierachyPage>().AddObject(go);
+
+                return go;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogException(ex);
                 return null;
             }
 
-            return assetbundleLoader;
-        }
-
-        public async void LoadAssets(List<string> paths)
-        {
-            // 卸载
-            UnloadAll();
-
-            if (assetbundleLoader == null)
-            {
-                return;
-            }
-
-            loadingPage.Show(true);
-            loadingPage.SetProgress(0.0f);
-
-            // 先加载场景
-            string sceneName = "";
-            foreach (var path in paths)
-            {
-                if(path.EndsWith(".unity"))
-                {
-                    sceneName = path;
-                    if (loadedSceneName_ == sceneName)
-                    {
-                        LogWindow.instance.Log($"{sceneName} already loaded...");
-                        sceneName = "";
-                        continue;
-                    }
-
-                    break;  // 只加载第一个场景
-                }
-            }
-
-            if (!string.IsNullOrEmpty(sceneName))
-            {
-                // load scene
-                var sceneBundle = await assetbundleLoader.LoadAssetBundleAsync(assetbundleLoader.GetAssetBundleByAssetName(sceneName));
-                loadingPage.SetProgress(0.32f);
-                if (!sceneBundle)
-                {
-                    sceneName = "Empty";
-                    LogWindow.instance.Log($"Assetbundle not contain's scene: ${sceneName}");
-                }
-
-                //sceneName = sceneName.Replace(".unity", "");
-                var ops = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Single);
-                StartCoroutine(LoadingScene(ops, sceneName));
-                await ops;
-
-                loadingPage.SetProgress(0.82f);
-            }
-
-
-            int cc = 0;
-            foreach (var path in paths)
-            {
-                // load prefab
-                if (!path.EndsWith(".unity"))
-                {
-                    var assetPfb = await assetbundleLoader.LoadAssetAsync<GameObject>(path);
-                    if (!assetPfb)
-                    {
-                        LogWindow.instance.Log($"there have no object {path} in assetbundle....");
-                        return;
-                    }
-
-                    // 禁用脚本
-                    var go = GameObject.Instantiate<GameObject>(assetPfb);
-                    foreach(var v in go.GetComponents<MonoBehaviour>())
-                    {
-                        v.enabled = false;
-                    }
-                    loadedObjects_.Add(go);
-
-                    ++cc;
-                    loadingPage.SetProgress(0.82f + 0.18f * cc / paths.Count);
-                }
-            }
-
-            loadingPage.Hide();
         }
 
         /// <summary>
@@ -176,79 +139,62 @@ namespace Wugou.AssetbundlePreviewer
         /// </summary>
         /// <param name="sceneName"></param>
         /// <returns></returns>
-        IEnumerator LoadingScene(AsyncOperation ops, string sceneName)
+        IEnumerator LoadingScene(string sceneName)
         {
-            while (!ops.isDone)
-            {
-                loadingPage.SetProgress(0.32f + ops.progress * 0.5f); 
+            var op = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Single);
 
-                yield return new WaitForEndOfFrame();
+            loadingPage.Show();
+            while (!op.isDone)
+            {
+                yield return null;
             }
 
+            loadingPage.Hide();
+            yield return null;
             yield return null;
 
-            //originCamera.SetActive(originCamera.scene.name == sceneName);
-            loadedSceneName_ = sceneName;
-
             // 摄像机启用 FlyCamera
-            var cams = GameObject.FindGameObjectsWithTag("MainCamera");
-            if (cams.Length <= 0)
-            {
-                LogWindow.instance.Log($"{sceneName} have no MainCamera");
-            }
+            var cam = Camera.main.gameObject;
+            flyCamera_ = cam.AddComponent<FlyCamera>();
+            flyCamera_.moveSpeed = 30;
+            flyCamera_.xRotSpeed = 180;
+            flyCamera_.yRotSpeed = 90;
 
-            foreach (var cam in cams)
-            {
-                if (cam.gameObject.activeInHierarchy && cam != originCamera)
-                {
-                    flyCamera_ = cam.AddComponent<FlyCamera>();
-                    flyCamera_.moveSpeed = 30;
-                    flyCamera_.xRotSpeed = 180;
-                    flyCamera_.yRotSpeed = 90;
-
-                    // move to start posisition
-                    //GameObject startPosParent = GameObject.Find("StartPositions");
-                    //Debug.Assert(startPosParent != null && startPosParent.transform.childCount > 0);
-                    
-
-                    break;
-                }
-            }
+            WeatherSystem.Load();
+            EnableOutline();
         }
-
-        private void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, LoadSceneMode mode)
+        //描边
+        private void EnableOutline()
         {
-            // camera replace
-            //print(originCamera.scene.name);
-            //print(scene.name);
-
+            if (!Camera.main.GetComponent<cakeslice.OutlineEffect>())
+            {
+                var comp = Camera.main.gameObject.AddComponent<cakeslice.OutlineEffect>();
+                comp.lineThickness = 1;
+                comp.lineIntensity = 1.51f;
+                comp.fillAmount = 0.1f;
+                ColorUtility.TryParseHtmlString("#FFC300", out comp.lineColor0);
+                ColorUtility.TryParseHtmlString("#BC5BB9", out comp.lineColor1);
+                ColorUtility.TryParseHtmlString("#0096FF", out comp.lineColor2);
+            }
         }
-
-        public void UnloadAll()
+        public void UnloadAssetBundle()
         {
-            //if (!string.IsNullOrEmpty(loadedSceneName_))
-            //{
-            //    await SceneManager.UnloadSceneAsync(loadedSceneName_);
-            //    loadedSceneName_ = "";
-
-            //    assetbundleLoader.Unload(true);
-            //}
-
-            foreach (var v in loadedObjects_)
+            if(assetbundleLoader != null)
             {
-                GameObject.Destroy(v);
+                assetbundleLoader.UnloadAsync(true);
+                rootWindow.GetChildWindow<HierachyPage>().ClearObjs();
             }
-            loadedObjects_.Clear();
-
-            if (originCamera)
-            {
-                originCamera.SetActive(true);
-            }
+            //SceneManager.MoveGameObjectToScene(gameObject, SceneManager.GetActiveScene());
+            //SceneManager.LoadScene("AssetbundlePreviewer");
         }
+
+#if WUGOU_XR
+        // for vr mode
+        public GameObject steamVRObj;
 
         public void EnterVR()
         {
-#if WUGOU_XR
+
             isVRMode = true;
             XRSystem.StartXR(0, () =>
             {
@@ -261,12 +207,10 @@ namespace Wugou.AssetbundlePreviewer
                     steamVRObj.transform.position = flyCamera_.transform.position;
                 }
             });
-#endif
         }
 
         public void ExitVR()
         {
-#if WUGOU_XR
             isVRMode = false;
             XRSystem.StopXR();
 
@@ -274,8 +218,8 @@ namespace Wugou.AssetbundlePreviewer
 
             // 相机操作
             originCamera.SetActive(true);
-#endif
         }
+#endif
     }
 }
 

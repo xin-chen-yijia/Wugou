@@ -11,7 +11,7 @@ namespace Wugou.Examples.UI
 {
     public class SimpleInRoomPage : UIBaseWindow
     {
-        private GameMap map_;
+        private GameMapPackage mapPackage_;
 
         public GameObject playerRowContainer;
         public GameObject playerRowPrefab;
@@ -25,7 +25,7 @@ namespace Wugou.Examples.UI
         public TMP_Text createTimeLabel;
         public TMP_Text descriptionLabel;
 
-        private Dictionary<MultiplayerGameRoomPlayer, GameObject> playerRowDictionary_ = new Dictionary<MultiplayerGameRoomPlayer, GameObject>();
+        private Dictionary<MultiplayerRoomPlayer, GameObject> playerRowDictionary_ = new Dictionary<MultiplayerRoomPlayer, GameObject>();
 
         /// <summary>
         /// 角色可选项
@@ -42,7 +42,7 @@ namespace Wugou.Examples.UI
         {
             startButton.onClick.AddListener(() =>
             {
-                MultiplayerGameManager.instance.StartGameplay(map_);
+                MultiplayerGameManager.instance.StartGameplay(mapPackage_);
 
                 Hide();
             });
@@ -102,23 +102,33 @@ namespace Wugou.Examples.UI
             });
         }
 
-        public void SetGameMap(GameMap map)
+        public void SetGameMap(GameMapPackage package)
         {
-            map_ = map;
+            mapPackage_ = package;
+
+            var gameMap = package.gameMap;
+            SetPlayerCount(gameMap.maxPlayerCount);
 
             // fill content
-            string iconName = GameMapManager.GetAssetbundleSceneIcon(map_.scene.sceneName);
-            Utils.LoadSpriteFromFileWithWebRequest(System.IO.Path.GetFullPath($"{GamePlay.settings.resourcePath}/{iconName}"), new Vector2(0.5f, 0.5f), (sprite) =>
+            Utils.DoAsync(async () =>
             {
-                mapIconImage.sprite = sprite;
+                foreach (var v in Gameplay.unitySceneManager.GetAllNames())
+                {
+                    var us = Gameplay.unitySceneManager.Get(v);
+                    if (us.scene == gameMap.scene)
+                    {
+                        mapIconImage.sprite = await GameAssetDatabase.GetAssetAsync<Sprite>(us.thumbnail);
+                        break;
+                    }
+                }
             });
-            nameLabel.text = $"脚本名称：{map_.name}";
-            authorLabel.GetComponent<TMP_Text>().text = $"作者：{map_.author}";
-            createTimeLabel.GetComponent<TMP_Text>().text = $"创建时间：{map_.createTime}";
-            descriptionLabel.GetComponent<TMP_Text>().text = $"{map_.description}";
+            nameLabel.text = $"脚本名称：{mapPackage_.name}";
+            authorLabel.GetComponent<TMP_Text>().text = $"作者：{gameMap.author}";
+            createTimeLabel.GetComponent<TMP_Text>().text = $"创建时间：{gameMap.createTime}";
+            descriptionLabel.GetComponent<TMP_Text>().text = $"{gameMap.description}";
         }
 
-        public void AddPlayer(MultiplayerGameRoomPlayer player)
+        public void AddPlayer(MultiplayerRoomPlayer player)
         {
             Wugou.Logger.Info("Add:" + player.playerId + ":" + player.playerName);
 
@@ -153,7 +163,7 @@ namespace Wugou.Examples.UI
             dropdown.interactable = player.isOwned;
         }
 
-        public void RemovePlayer(MultiplayerGameRoomPlayer player)
+        public void RemovePlayer(MultiplayerRoomPlayer player)
         {
             if (playerRowDictionary_.ContainsKey(player) && playerRowDictionary_[player])
             {
@@ -163,7 +173,7 @@ namespace Wugou.Examples.UI
             }
         }
 
-        public void UpdatePlayerName(MultiplayerGameRoomPlayer player)
+        public void UpdatePlayerName(MultiplayerRoomPlayer player)
         {
             if (!playerRowDictionary_.ContainsKey(player))
             {
@@ -174,7 +184,7 @@ namespace Wugou.Examples.UI
             playerRowDictionary_[player].transform.Find("Name").GetComponent<TMP_Text>().text = player.playerName;
         }
 
-        public void UpdatePlayerRole(MultiplayerGameRoomPlayer player)
+        public void UpdatePlayerRole(MultiplayerRoomPlayer player)
         {
             if (!playerRowDictionary_.ContainsKey(player))
             {

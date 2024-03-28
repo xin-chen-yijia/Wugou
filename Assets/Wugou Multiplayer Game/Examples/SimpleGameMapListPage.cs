@@ -1,17 +1,9 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using Wugou.UI;
-using TMPro;
-using UnityEngine.UI;
-using Wugou;
-using System.IO;
-using Newtonsoft.Json;
 using System;
-using UnityEngine.Events;
-using Wugou.MapEditor;
-using UnityEngine.SceneManagement;
-using UnityEngine.EventSystems;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+using Wugou.Editor;
+using Wugou.UI;
 
 namespace Wugou.Examples.UI
 {
@@ -29,14 +21,18 @@ namespace Wugou.Examples.UI
         {
             newMapButton.GetComponent<Button>().onClick.AddListener(() =>
             {
-                GameMap map = new GameMap();
+                GameMap map = GameMap.Create();
                 map.Parse("{}");
-                map.scene = new AssetBundleScene() { sceneName = "ZZ", assetbundle = new AssetBundleDesc() { path = "assetbundles/ZZ" } };
+                map.scene = "/ZZ/ZZ.unity";
                 map.weather.time = 0.4f;
                 map.version = GameMap.kLatestVersion;
                 map.createTime = DateTime.Now.ToString();
                 map.name = "new map";
-                MapEditorSystem.StartEditor(map);
+
+                var proj = new GameMapProj($"{Gameplay.gameMapProjsPath}/test");
+                proj.gameMap = map;
+                GameMapEditor.StartEditor(proj);
+
                 Hide();
             });
         }
@@ -50,18 +46,18 @@ namespace Wugou.Examples.UI
 
         public void Refresh()
         {
-            var scripts = GameMapManager.GetAllGameMapFiles();
+            var projs = Gameplay.gameMapProjManager.GetAllNames();
 
             activeMap_ = null;
             GameObject lastSelectRow = null;
-            Utils.FillContent(scriptItemContainer, scriptItemPrefab, scripts, (GameObject item, string mapName) =>
+            Utils.FillContent(scriptItemContainer, scriptItemPrefab, projs, (GameObject item, string mapProjName) =>
             {
                 item.gameObject.SetActive(true);
-                item.name = mapName;
-                var map = GameMapManager.GetGameMap(mapName);
-                item.transform.Find("Name").GetComponent<TMP_Text>().text = map.name;
-                item.transform.Find("Time").GetComponent<TMP_Text>().text = map.createTime;
-                item.transform.Find("Author").GetComponent<TMP_Text>().text = map.author;
+                item.name = mapProjName;
+                var mapProj = Gameplay.gameMapProjManager.Get(mapProjName);
+                item.transform.Find("Name").GetComponent<TMP_Text>().text = mapProj.name;
+                item.transform.Find("Time").GetComponent<TMP_Text>().text = mapProj.gameMap.createTime;
+                item.transform.Find("Author").GetComponent<TMP_Text>().text = mapProj.gameMap.author;
 
                 float clickTime = -1;
                 item.transform.Find("Button").GetComponent<Button>().onClick.AddListener(() =>
@@ -74,13 +70,13 @@ namespace Wugou.Examples.UI
                     checkedObj.SetActive(true);
                     lastSelectRow = checkedObj;
 
-                    activeMap_ = map;
+                    activeMap_ = mapProj.gameMap;
 
                     // double click
                     if(Time.realtimeSinceStartup - clickTime < 0.2f)
                     {
-                        GamePlay.loadedGameMapFile = mapName;
-                        MapEditorSystem.StartEditor(map);
+                        Gameplay.loadedGameMapFile = mapProjName;
+                        Editor.GameMapEditor.StartEditor(mapProj);
 
                         Hide();
                     }
@@ -92,10 +88,10 @@ namespace Wugou.Examples.UI
 
                 item.transform.Find("Edit").GetComponent<Button>().onClick.AddListener(() =>
                 {
-                    if (map != null)
+                    if (mapProj != null)
                     {
-                        GamePlay.loadedGameMapFile = mapName;
-                        MapEditorSystem.StartEditor(map);
+                        Gameplay.loadedGameMapFile = mapProjName;
+                        Editor.GameMapEditor.StartEditor(mapProj);
                         Hide();
                     }
 
@@ -104,7 +100,7 @@ namespace Wugou.Examples.UI
                 int tmpId = item.GetInstanceID();
                 item.transform.Find("Delete").GetComponent<Button>().onClick.AddListener(() =>
                 {
-                    rootWindow.GetChildWindow<MakeSurePage>().ShowOptions($"确定删除{map.name}?", () =>
+                    DaemonUI.makeSurePage.ShowOptions($"确定删除{mapProj.name}?", () =>
                     {
                         if (lastSelectRow && lastSelectRow.transform.parent.GetInstanceID() == tmpId)
                         {
@@ -113,7 +109,7 @@ namespace Wugou.Examples.UI
                         }
 
                         //删除脚本和记录
-                        GameMapManager.RemoveGameMap(map.name);
+                        SimpleNonGamingSystem.gameMapManager.Remove(mapProj.name);
 
                         //ui delete
                         GameObject.Destroy(item.gameObject);

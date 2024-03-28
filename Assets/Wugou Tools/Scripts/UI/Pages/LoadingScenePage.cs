@@ -12,17 +12,6 @@ namespace Wugou.UI
         public Slider progressBar;
         public TMP_Text progressText;
 
-        //// Start is called before the first frame update
-        //void Start()
-        //{
-        //}
-
-        //// Update is called once per frame
-        //void Update()
-        //{
-
-        //}
-
         public void SetProgress(float progress)
         {
             progressBar.value = progress;
@@ -37,6 +26,28 @@ namespace Wugou.UI
         public void SetText(string text)
         {
             progressText.text = text;
+        }
+
+        public void UpdateProgressBar(System.Func<float> getProgress)
+        {
+            StartCoroutine(UpdateProgressBarInternal(getProgress));
+        }
+
+        IEnumerator UpdateProgressBarInternal(System.Func<float> getProgress)
+        {
+            bool bUpdateProgress = true;
+            while (bUpdateProgress)
+            {
+                float p = getProgress.Invoke();
+                DaemonUI.loadingPage.SetProgress(p);
+
+                if (p > 0.9999999f)
+                {
+                    bUpdateProgress = false;
+                }
+
+                yield return null;
+            }
         }
     }
 

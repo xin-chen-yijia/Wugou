@@ -11,7 +11,7 @@ namespace Wugou.UI
         /// <summary>
         /// 根窗口
         /// </summary>
-        public UIBaseWindow rootWindow => transform.GetComponentInParent<UIRootWindow>();
+        public UIRootWindow rootWindow => transform.GetComponentInParent<UIRootWindow>();
 
         public virtual bool isShow
         {
@@ -43,26 +43,6 @@ namespace Wugou.UI
         }
 
         /// <summary>
-        /// 获取子窗口
-        /// </summary>
-        /// <param name="t"></param>
-        /// <returns></returns>
-        public UIBaseWindow GetOrAddChildWindow(Type t)
-        {
-            string wndName = t.Name;
-            Transform wnd = transform.Find(wndName);
-            Debug.Assert(wnd);
-
-            var tmp = wnd.GetComponent(t);
-            if (!tmp)
-            {
-                tmp = wnd.gameObject.AddComponent(t);
-            }
-
-            return tmp as UIBaseWindow;
-        }
-
-        /// <summary>
         /// 根据类型名称，找Canvas下同名的物体，并把脚本添加该物体
         /// </summary>
         /// <typeparam name="T"></typeparam>
@@ -86,11 +66,34 @@ namespace Wugou.UI
         }
 
         /// <summary>
+        /// Resources中存放ui的目录
+        /// </summary>
+        public static string path = "UI";
+
+        /// <summary>
+        /// 从Resouces文件夹中创建新的window
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        public UIBaseWindow AddChildWindow(Type type)
+        {
+            GameObject pagePfb = Resources.Load<GameObject>($"{path}/{type.Name}");
+            Debug.Assert(pagePfb);
+            GameObject pageObj = Instantiate<GameObject>(pagePfb,transform);
+            var page = pageObj.GetComponent(type);
+            if (!page)
+            {
+                page = pageObj.AddComponent(type);
+            }
+            return page as UIBaseWindow;
+        }
+
+        /// <summary>
         /// 在当前窗口下添加新窗口
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="obj"></param>
-        public void AddChildWindow<T>(GameObject obj) where T : UIBaseWindow
+        public T AddChildWindow<T>(GameObject obj) where T : UIBaseWindow
         {
             obj.transform.SetParent(transform);
             obj.transform.localPosition = Vector3.zero;
@@ -99,6 +102,8 @@ namespace Wugou.UI
             {
                 obj.AddComponent<T>();
             }
+
+            return obj.GetComponent<T>();
         }
     }
 

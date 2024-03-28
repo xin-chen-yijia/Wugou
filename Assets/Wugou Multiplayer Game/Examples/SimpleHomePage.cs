@@ -6,6 +6,7 @@ using Wugou.UI;
 using UnityEngine.UI;
 using System;
 using TMPro;
+using UnityEngine.SceneManagement;
 
 namespace Wugou.Examples.UI
 {
@@ -27,18 +28,12 @@ namespace Wugou.Examples.UI
         /// </summary>
         public const int StatisticPageId = 1;
 
-        private void Awake()
-        {
-    
-        }
-
         // Start is called before the first frame update
         void Start()
         {
             trainingButton.onClick.AddListener(() =>
             {
-                SimpleNonGamingSystem.instance.EnterLobby();
-
+                SceneManager.LoadScene(Gameplay.settings.networkMainScene);
             });
 
             foreach (var v in tabs)

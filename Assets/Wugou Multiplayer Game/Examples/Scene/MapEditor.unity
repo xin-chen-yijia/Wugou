@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.0842548, g: 0.10140448, b: 0.11430877, a: 1}
+  m_IndirectSpecularColor: {r: 0.0842343, g: 0.10138872, b: 0.11429767, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -5192,6 +5192,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   nameInput: {fileID: 496778910}
+  enableToggle: {fileID: 0}
 --- !u!1 &413059481
 GameObject:
   m_ObjectHideFlags: 0
@@ -6096,8 +6097,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u5929\u6C14"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
-  m_sharedMaterial: {fileID: 8583973629133061658, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -7430,8 +7431,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u9000\u51FA"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
-  m_sharedMaterial: {fileID: 8583973629133061658, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -7966,7 +7967,7 @@ GameObject:
   - component: {fileID: 582547375}
   - component: {fileID: 582547376}
   m_Layer: 0
-  m_Name: MapEditorSystem
+  m_Name: MapEditor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -7997,12 +7998,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 582547374}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d9145b4bc2824554b858091f5e3a2849, type: 3}
+  m_Script: {fileID: 11500000, guid: ed54c773f48204243b2baf6b03f04bb5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   uiRootWindow: {fileID: 511207744}
-  useFlyCamera: 1
   editorAxis: {fileID: 6549717949910696228}
+  useFlyCamera: 1
+  editorCamera: {fileID: 0}
+  previewCamera: {fileID: 0}
   terrainLayer: 0
   maxRayDistance: 1000
 --- !u!1 &583712645
@@ -9514,8 +9517,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u5C5E\u6027\u9762\u677F"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
-  m_sharedMaterial: {fileID: 8583973629133061658, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -11750,7 +11753,7 @@ GameObject:
   - component: {fileID: 965083973}
   - component: {fileID: 965083975}
   m_Layer: 5
-  m_Name: GameMapSavelPage
+  m_Name: GameMapSavePage
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -13949,8 +13952,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u5E2E\u52A9"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
-  m_sharedMaterial: {fileID: 8583973629133061658, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -17271,8 +17274,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u52A0\u8F7D\u4E2D"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
-  m_sharedMaterial: {fileID: 8583973629133061658, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -26876,6 +26879,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d92e85ff3da35724f999356d139a9bba, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  quitButton: {fileID: 0}
+  buildButton: {fileID: 0}
+  previewButton: {fileID: 0}
 --- !u!1 &2129063945
 GameObject:
   m_ObjectHideFlags: 0
@@ -26973,8 +26979,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: GG
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
-  m_sharedMaterial: {fileID: 8583973629133061658, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -32281,7 +32287,7 @@ MonoBehaviour:
   weatherTypeDropdown: {fileID: 2131653356030080277}
   timeSlider: {fileID: 2131653354646005393}
   fogSlider: {fileID: 1965925309}
-  windForceInput: {fileID: 1864664035}
+  windForceDropdown: {fileID: 0}
 --- !u!1 &2131653354757746622
 GameObject:
   m_ObjectHideFlags: 0
@@ -37442,7 +37448,7 @@ MonoBehaviour:
   axis: {fileID: 2102063486334441393}
   controllerPlane: {fileID: 87767583808625134}
   editorCamera: {fileID: 0}
-  enableSelectObj: 1
+  selfFindTarget: 0
   onOptionModeChanged:
     m_PersistentCalls:
       m_Calls: []
@@ -38856,8 +38862,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u6A21\u578B\u5E93"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
-  m_sharedMaterial: {fileID: 8583973629133061658, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -39225,8 +39231,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: New Text
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
-  m_sharedMaterial: {fileID: 8583973629133061658, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -39510,8 +39516,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u6536\u8D77"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
-  m_sharedMaterial: {fileID: 8583973629133061658, guid: ec7289eb09c94914abe1e799f96c662b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

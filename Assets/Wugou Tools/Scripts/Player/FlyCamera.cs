@@ -1,15 +1,11 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.EventSystems;
 
 namespace Wugou
 {
     public class FlyCamera : MonoBehaviour
     {
-        [Header("UI")]
-        public bool enableOnUI = false;
-
         [Header("摄像机移动")]
         public float moveSpeed = 5.0f;
 
@@ -24,7 +20,7 @@ namespace Wugou
         private Transform parentTrans_ = null;
 
         // 控制鼠标移动视角
-        public bool moveEnable { get; set; } = true;
+        public bool freezeMouseMove { get; set; } = false;
 
         // 视角中心
         public Vector3 viewCenter { 
@@ -39,23 +35,40 @@ namespace Wugou
             }
         }
 
+        private bool isInit_ = false;
+
+        /// <summary>
+        /// 用于加载场景等情况下手动初始化
+        /// </summary>
+        public void Init()
+        {
+            if(!isInit_)
+            {
+                isInit_ = true;
+
+                parentTrans_ = transform.parent;
+                if (!parentTrans_)
+                {
+                    GameObject parentObj = new GameObject("FlyCamera");
+                    parentTrans_ = parentObj.transform;
+                    parentObj.tag = "Player";
+
+                    // camera view parent,so parent at camera forward
+                    parentTrans_.position = transform.position + transform.forward * viewCenterDistance;
+
+                    // camera parent's origin rotation same with camera's rotation
+                    parentTrans_.rotation = transform.rotation;
+
+                    // put camera under parentTrans_
+                    transform.SetParent(parentTrans_);
+                }
+            }
+        }
+
         // Start is called before the first frame update
         void Start()
         {
-            parentTrans_ = transform.parent;
-            if (!parentTrans_)
-            {
-                GameObject parentObj = new GameObject("FlyCamera");
-                parentTrans_ = parentObj.transform;
-                parentObj.tag = "Player";
-
-                // camera view parent,so parent at camera forward
-                parentTrans_.position = transform.position + transform.forward * viewCenterDistance;
-
-                // camera parent's origin rotation same with camera's rotation
-                parentTrans_.rotation = transform.rotation;
-                transform.SetParent(parentTrans_);
-            }
+            Init();
         }
 
         // 飞行时间越久，速度越快
@@ -64,11 +77,6 @@ namespace Wugou
         // Update is called once per frame
         void Update()
         {
-            if (!enableOnUI && EventSystem.current.IsPointerOverGameObject())
-            {
-                return;
-            }
-
             float hx = 0.0f;
             float hy = 0.0f;
             float hz = 0.0f;
@@ -78,7 +86,10 @@ namespace Wugou
             float dx = Input.GetAxis("Mouse X");
             float dy = Input.GetAxis("Mouse Y");
 
-            if(Mathf.Abs(hx) < 0.01f && Mathf.Abs(hz) < 0.01f)
+            // 常按加速
+            bool isKeyDown = Mathf.Abs(hx) > 0.01f || Mathf.Abs(hz) > 0.01f || Input.GetKey(KeyCode.Q) || Input.GetKey(KeyCode.E);
+
+            if(!isKeyDown)
             {
                 moveMultiplier_ = 1.0f;
             }
@@ -86,7 +97,7 @@ namespace Wugou
             if(accruedTime > 0.1f)
             {
                 accruedTime = 0.0f;
-                moveMultiplier_ *= 1.01f;
+                moveMultiplier_ *= 1.04f;
                 moveMultiplier_ = Mathf.Clamp(moveMultiplier_, 1, 12);
             }
 
@@ -98,14 +109,18 @@ namespace Wugou
             }
 
             // 鼠标左键控制移动
-            if (Input.GetMouseButton(0) && moveEnable)
+            if (Input.GetMouseButton(0) && !freezeMouseMove)
             {
                 hx += -dx * 10;
                 hy += -dy * 10;
-                //parentTrans_.Translate((-hx) * tSpeed, (-hy) * tSpeed, dy * tSpeed, Space.Self);       
+                parentTrans_.Translate((hx) * tSpeed, (hy) * tSpeed, dy * tSpeed, Space.Self);       
             }
 
-            parentTrans_.Translate(hx * tSpeed, hy * tSpeed, hz * tSpeed, Space.Self);
+            // 常按右键移动
+            if (Input.GetMouseButton(1))
+            {
+                parentTrans_.Translate(hx * tSpeed, hy * tSpeed, hz * tSpeed, Space.Self);
+            }
 
             if (Input.GetKey(KeyCode.Q))
             {
@@ -117,7 +132,7 @@ namespace Wugou
                 parentTrans_.Translate(0.0f, tSpeed * 0.35f, 0.0f, Space.Self);
             }
 
-
+            // 旋转
             if (Input.GetMouseButton(1))
             {
                 float xAngle = xRotSpeed * dx * Time.deltaTime;
@@ -132,6 +147,28 @@ namespace Wugou
                 parentTrans_.rotation = Quaternion.Euler(0, xAngle, 0) * parentTrans_.rotation;
                 parentTrans_.Rotate(yAngle, 0, 0, Space.Self);
             }
+        }
+
+        /// <summary>
+        /// Camera Locate to target,  just as camera's transform locate to target
+        /// </summary>
+        /// <param name="target"></param>
+        public void LocateCameraTo(Transform target)
+        {
+            if(parentTrans_ != null)
+            {
+                // camera view parent,so parent at camera forward
+                parentTrans_.position = target.position + target.forward * viewCenterDistance;
+
+                // camera parent's origin rotation same with camera's rotation
+                parentTrans_.rotation = target.rotation;
+            }
+            else
+            {
+                transform.position = target.position;
+                transform.rotation = target.rotation;
+            }
+
         }
     }
 }

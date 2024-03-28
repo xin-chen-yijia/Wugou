@@ -3,9 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.NetworkInformation;
 using System.Reflection;
-using System.Threading;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Events;
@@ -120,7 +119,7 @@ namespace Wugou
         }
 
         /// <summary>
-        /// 填充列表，并自动调整框高
+        /// 填充列表，并自动调整框高，注意，函数中有异步操作，对于被使用来填充的prefab中有Resize的情况时需要谨慎处理
         /// 注意，以左上角为锚点
         /// </summary>
         /// <typeparam name="T"></typeparam>
@@ -143,7 +142,6 @@ namespace Wugou
             // hide first
             prefab.SetActive(false);
 
-
             for (int i = 0; i < contents.Count; i++)
             {
                 var content = contents[i];
@@ -151,27 +149,15 @@ namespace Wugou
                 item.SetActive(true);
                 onInstantiatePrefab(item, content);       // 这里可能改变item大小
             }
-
-
-            ResizeContainer(container);
-        }
-
-        public static IEnumerator DelayAndDo(int frames, System.Action action)
-        {
-            // 延迟3帧
-            while (frames-- > 0)
-            {
-                yield return null;
-            }
-
-            action?.Invoke();
+            
+            _ = ResizeContainer(container);
         }
 
         /// <summary>
         /// 根据布局重型调整容器大小，主要用于scrollrect中的content resize
         /// </summary>
         /// <param name="container"></param>
-        public static void ResizeContainer(GameObject container)
+        public static async Task<bool> ResizeContainer(GameObject container)
         {
             var containerTrans = container.GetComponent<RectTransform>();
             if (container.transform.childCount > 0)
@@ -208,6 +194,7 @@ namespace Wugou
                     }
                     else
                     {
+                        await new YieldInstructionAwaiter(null);
                         containerTrans.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, -((containerTrans.GetChild(containerTrans.childCount - 1) as RectTransform).anchoredPosition.y - (containerTrans.GetChild(0) as RectTransform).anchoredPosition.y) + layout.cellSize.y + layout.padding.top + layout.padding.bottom);
 
                     }
@@ -217,6 +204,8 @@ namespace Wugou
                     // not resize
                 }
             }
+
+            return true;
         }
 
         /// <summary>
@@ -224,23 +213,12 @@ namespace Wugou
         /// </summary>
         /// <param name="container"></param>
         /// <param name="delay"></param>
-        public static void ResizeContainerHeight(GameObject container)
+        public static async void ResizeContainerHeight(GameObject container)
         {
-            CoroutineLauncher.active.StartCoroutine(DelayResizeContainerHeight(container));
-        }
+            await new YieldInstructionAwaiter(null);
+            await new YieldInstructionAwaiter(null);
+            await new YieldInstructionAwaiter(null);
 
-        private static IEnumerator DelayResizeContainerHeight(GameObject container)
-        {
-            // 延迟3帧
-            yield return null;
-            yield return null;
-            yield return null;
-
-            ResizeContainerHeightInternal(container);
-        }
-
-        private static void ResizeContainerHeightInternal(GameObject container)
-        {
             //var size = container.GetComponent<RectTransform>().sizeDelta;
             var layout = container.GetComponent<LayoutGroup>();
 
@@ -251,38 +229,21 @@ namespace Wugou
             container.GetComponent<RectTransform>().SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, layout.padding.top + layout.padding.bottom + (-(lastChild.localPosition.y - firstChild.localPosition.y)) + firstChild.GetComponent<RectTransform>().sizeDelta.y * 0.5f + lastChild.GetComponent<RectTransform>().sizeDelta.y * 0.5f);
         }
 
-        // 缓存，避免重复加载
-        private static Dictionary<string, Sprite> spritesCache = new Dictionary<string, Sprite>();
-
-        /// <summary>
-        /// 清理Sprite的缓存
-        /// </summary>
-        public static void ReleaseCache()
-        {
-            spritesCache.Clear();
-            texturesCache.Clear();
-        }
-
-        /// <summary>
-        /// 图片缓存，避免重复加载
-        /// </summary>
-        public static Dictionary<string, Texture2D> texturesCache = new Dictionary<string, Texture2D>();
-
         /// <summary>
         /// 使用本地文件生成Texture2d
         /// </summary>
         /// <param name="filePath"></param>
-        /// <param name="useCache"></param>
         /// <returns></returns>
-        public static Texture2D LoadTextureFromFile(string filePath, bool useCache = true)
+        public static Texture2D LoadTextureFromFile(string filePath)
         {
-            if (useCache && texturesCache.ContainsKey(filePath))
+            if (string.IsNullOrEmpty(filePath))
             {
-                return texturesCache[filePath];
+                return null;
             }
 
             if (!File.Exists(filePath))
             {
+                Logger.Warning($"{filePath} not exists..");
                 return null;
             }
             //创建文件读取流
@@ -300,23 +261,17 @@ namespace Wugou
             Texture2D texture = new Texture2D(256, 256);
             texture.LoadImage(bytes);
 
-            texturesCache.Add(filePath, texture);
-
             return texture;
         }
 
         /// <summary>
         /// 异步记载纹理,web 平台不适用
+        /// 只支持png和jpg格式
         /// </summary>
         /// <param name="filePath">支持网络路径</param>
-        /// <param name="useCache">支持网络路径</param>
         /// <returns></returns>
-        public static async Task<Texture2D> LoadTextureFromFileAsync(string filePath, bool useCache = true)
+        public static async Task<Texture2D> LoadTextureAsync(string filePath)
         {
-            if (useCache && texturesCache.ContainsKey(filePath))
-            {
-                return texturesCache[filePath];
-            }
             using (UnityWebRequest www = UnityWebRequestTexture.GetTexture(filePath))
             {
                 await www.SendWebRequest();
@@ -334,7 +289,6 @@ namespace Wugou
                 }
 #endif
                 var tex = DownloadHandlerTexture.GetContent(www);
-                texturesCache[filePath] = tex;
                 return tex;
             }
         }
@@ -344,26 +298,17 @@ namespace Wugou
         /// </summary>
         /// <param name="filePath"></param>
         /// <param name="pivot"></param>
-        /// <param name="useCache"></param>
         /// <returns></returns>
-        public static Sprite LoadSpriteFromFile(string filePath, Vector2 pivot, bool useCache = true)
+        public static Sprite LoadSpriteFromFile(string filePath, Vector2 pivot)
         {
-            if (spritesCache.ContainsKey(filePath))
+            var texture = LoadTextureFromFile(filePath);
+            if (!texture)
             {
-                return spritesCache[filePath];
-            }
-
-            if (!File.Exists(filePath))
-            {
-                Logger.Warning($"{filePath} not exists..");
                 return null;
             }
 
-            var texture = LoadTextureFromFile(filePath);
-
             //创建Sprite
             Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), pivot);
-            spritesCache[filePath] = sprite;
             return sprite;
         }
 
@@ -376,11 +321,6 @@ namespace Wugou
         /// <param name="useCache"></param>
         public static void LoadSpriteFromFileWithWebRequest(string filePath, Vector2 pivot, UnityAction<Sprite> onLoaded, bool useCache = true)
         {
-            if (spritesCache.ContainsKey(filePath))
-            {
-                onLoaded?.Invoke(spritesCache[filePath]);
-                return;
-            }
             CoroutineLauncher.active.StartCoroutine(LoadTexture2D(filePath, pivot, onLoaded));
         }
 
@@ -393,7 +333,6 @@ namespace Wugou
             {
                 var texture = DownloadHandlerTexture.GetContent(request);
                 Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
-                spritesCache[path] = sprite;
                 onLoaded?.Invoke(sprite);
             }
             else
@@ -519,9 +458,12 @@ namespace Wugou
             if(thumbnailCam == null)
             {
                 var camObj = new GameObject("thumbnail camera",typeof(Camera));
+                //var camObj = GameObject.Instantiate<GameObject>(Camera.main.gameObject,null);    // use camera on scene
+                camObj.name = "thumbnail camera";
                 DontDestroyRootOnLoad(camObj);
                 thumbnailCam = camObj.GetComponent<Camera>();
                 thumbnailCam.enabled = false;
+
             }
             // 
             thumbnailCam.CopyFrom(cam);
@@ -551,23 +493,24 @@ namespace Wugou
             rt.Release();
 
             // save
-            var bytes = icon.EncodeToPNG();
+            var bytes = icon.EncodeToJPG();
             File.WriteAllBytes(path, bytes);
             return icon;
 
         }
 
+#if UNITY_EDITOR || WUGOU_NETWORK_INFOMATION
         /// <summary>
         /// 获取第一个网卡的mac地址
         /// </summary>
         /// <returns></returns>
         public static string GetFirstMACAddress()
         {
-            NetworkInterface[] nics = NetworkInterface.GetAllNetworkInterfaces();
+            System.Net.NetworkInformation.NetworkInterface[] nics = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
             String sMacAddress = string.Empty;
-            foreach (NetworkInterface adapter in nics)
+            foreach (var adapter in nics)
             {
-                if(adapter.OperationalStatus == OperationalStatus.Up)
+                if(adapter.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up)
                 {
                     return adapter.GetPhysicalAddress().ToString();
                 }
@@ -588,27 +531,28 @@ namespace Wugou
         /// <returns></returns>
         public static List<string> GetAllMacAddress()
         {
-            NetworkInterface[] nics = NetworkInterface.GetAllNetworkInterfaces();
+            System.Net.NetworkInformation. NetworkInterface[] nics = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
             HashSet<string> res = new HashSet<string>();
-            foreach (NetworkInterface adapter in nics)
+            foreach (var adapter in nics)
             {
                 res.Add(adapter.GetPhysicalAddress().ToString());
             }
             return res.ToList();
         }
+#endif
 
         /// <summary>
         /// Indicates whether or not the specified type is a list.
         /// </summary>
         /// <param name="type">The type to query</param>
         // <returns>True if the type is a list, otherwise false</returns>
-        public static bool IsList(Type type)
+        public static bool IsListOrArray(Type type)
         {
             if (null == type)
             {
                 throw new ArgumentNullException("type");
             }
-            if (typeof(System.Collections.IList).IsAssignableFrom(type))
+            if (typeof(System.Collections.IList).IsAssignableFrom(type))  // 数组也会通过
             {
                 return true;
             }
@@ -683,6 +627,173 @@ namespace Wugou
             return null;
         }
 
+        /// <summary>
+        /// 深拷贝对象
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="obj"></param>
+        /// <returns></returns>
+        public static T DeepClone<T>(T obj) where T : class
+        {
+            if(obj is ScriptableObject)
+            {
+                var ret = ScriptableObject.CreateInstance(typeof(T));   
+                var ss = Newtonsoft.Json.JsonConvert.SerializeObject(obj);
+                Newtonsoft.Json.JsonConvert.PopulateObject(ss,ret);
+                return ret as T;
+            }
+            else
+            {
+                var ss = Newtonsoft.Json.JsonConvert.SerializeObject(obj);
+                return Newtonsoft.Json.JsonConvert.DeserializeObject<T>(ss);
+            }
+
+        }
+
+        public static async Task<string> WebRequest(string uri, WWWForm form)
+        {
+            using (UnityWebRequest webRequest = UnityWebRequest.Post(uri, form))
+            {
+                webRequest.SetRequestHeader("Authorization", $"Bearer {Authorization.activeUser.token}");
+                // Request and wait for the desired page.
+                await webRequest.SendWebRequest();
+
+                string[] pages = uri.Split('/');
+                int page = pages.Length - 1;
+
+                switch (webRequest.result)
+                {
+                    case UnityWebRequest.Result.ConnectionError:
+                    case UnityWebRequest.Result.DataProcessingError:
+                        Debug.LogError(pages[page] + ": Error: " + webRequest.error);
+                        break;
+                    case UnityWebRequest.Result.ProtocolError:
+                        Debug.LogError(pages[page] + ": HTTP Error: " + webRequest.error);
+                        break;
+                    case UnityWebRequest.Result.Success:
+                        return webRequest.downloadHandler.text;
+                }
+            }
+
+            return "";
+        }
+
+        /// <summary>
+        /// 用于异步方法调用，避免重复代码
+        /// </summary>
+        /// <param name="action"></param>
+        public static void DoAsync(System.Action action)
+        {
+            action?.Invoke();
+        }
+
+        /// <summary>
+        /// 拷贝文件夹
+        /// </summary>
+        /// <param name="sourcePath"></param>
+        /// <param name="targetPath"></param>
+        public static void CopyDirectory(string sourcePath, string targetPath)
+        {
+            // 
+            Directory.CreateDirectory(targetPath);
+
+            //Now Create all of the directories
+            foreach (string dirPath in Directory.GetDirectories(sourcePath, "*", SearchOption.AllDirectories))
+            {
+                Directory.CreateDirectory(dirPath.Replace(sourcePath, targetPath));
+            }
+
+
+            //Copy all the files & Replaces any files with the same name
+            foreach (string newPath in Directory.GetFiles(sourcePath, "*.*", SearchOption.AllDirectories))
+            {
+                File.Copy(newPath, newPath.Replace(sourcePath, targetPath), true);
+            }
+        }
+
+        /// <summary>
+        /// 结构体转byte[]
+        /// </summary>
+        /// <param name="obj"></param>
+        /// <param name="size"></param>
+        /// <returns></returns>
+        public static byte[] StructToBytes<T>(T obj)
+        {
+            var size = Marshal.SizeOf(obj);
+            byte[] bytes = new byte[size];
+
+            IntPtr structPtr = IntPtr.Zero;
+            try
+            {
+                structPtr = Marshal.AllocHGlobal(size);
+                Marshal.StructureToPtr(obj, structPtr, false);
+                Marshal.Copy(structPtr, bytes, 0, size);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(structPtr);
+            }
+
+            return bytes;
+        }
+
+        /// <summary>
+        /// byte转结构体
+        /// </summary>
+        /// <param name="bytes"></param>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        public static T BytesToStruct<T>(byte[] bytes)
+        {
+            Type type = typeof(T);
+            int size = Marshal.SizeOf(type);
+            if (size > bytes.Length)
+                return default;
+
+            T obj = default(T);
+            IntPtr structPtr = IntPtr.Zero;
+            try
+            {
+                structPtr = Marshal.AllocHGlobal(size);
+                Marshal.Copy(bytes, 0, structPtr, size);
+
+               obj = (T)Marshal.PtrToStructure(structPtr, type);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(structPtr);
+            }
+
+            return obj;
+        }
+
+        /// <summary>
+        /// 获取子物体相对父物体的路径，用于Find查找
+        /// </summary>
+        /// <param name="child"></param>
+        /// <param name="root"></param>
+        /// <returns></returns>
+        public static string GetRelativePath(Transform child, Transform root)
+        {
+            var t = child.transform;
+            string path = child.name;
+            while (t && t.parent != root)
+            {
+                path = t.parent.name + "/" + path;
+                t = t.parent;
+            }
+
+            return path;
+        }
+
+        public static bool IsPrefab(GameObject obj)
+        {
+#if UNITY_EDITOR
+            return UnityEditor.PrefabUtility.IsPartOfPrefabAsset(obj);
+#else
+            return false;
+#endif
+        }
     }
 }
 

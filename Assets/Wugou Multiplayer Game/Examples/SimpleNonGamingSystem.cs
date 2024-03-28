@@ -7,30 +7,28 @@ using TMPro;
 using Wugou.Multiplayer;
 using System.IO;
 using Wugou.Examples.UI;
-using Wugou.MapEditor;
+using Wugou.Editor;
 
 namespace Wugou.Examples
 {
-    public class SimpleNonGamingSystem : NonGamingSystem
+    public class SimpleNonGamingSystem : MonoBehaviour
     {
-        public override void Start()
-        {
-            base.Start();
+        public static FileAssetsManager<GameMap> gameMapManager { get; private set; }
 
+        public UIRootWindow rootWindow;
+
+        public void Start()
+        {
             // show window
-            uiRootWindow.Show();
-            uiRootWindow.GetChildWindow<SimpleHomePage>().Show();
-            uiRootWindow.GetChildWindow<SimpleGameMapListPage>().Show();
-            uiRootWindow.GetChildWindow<SimpleGameMapListPage>().Refresh();
+            rootWindow.Show();
+            rootWindow.GetChildWindow<SimpleHomePage>().Show();
+            rootWindow.GetChildWindow<SimpleGameMapListPage>().Show();
+            rootWindow.GetChildWindow<SimpleGameMapListPage>().Refresh();
+
+            gameMapManager = new FileAssetsManager<GameMap>($"{Gameplay.downloadGameMapsPath}", ".map", new GameMapFileParser());
 
             // 游戏记录管理
-            GamePlay.gameStatsManager = new GameStatsManager(Path.Combine(Application.persistentDataPath, "gamestats"));
-
-            // 
-            MapEditorSystem.onSaveGameMap.AddListener((fileName, map) =>
-            {
-                GameMapManager.SaveGameMap(fileName, map);
-            });
+            Gameplay.gameStatsManager = new FileAssetsManager<GameStats>($"{Application.persistentDataPath}/gamestats",".gt");
 
             StartCoroutine(DelayDo());
 
@@ -51,12 +49,12 @@ namespace Wugou.Examples
         {
             yield return null;
 
-            if (GamePlay.lastGameStats != null)
+            if (Gameplay.lastGameStats != null)
             {
-                uiRootWindow.GetChildWindow<SimpleHomePage>().Toggle(SimpleHomePage.StatisticPageId);
-                uiRootWindow.GetChildWindow<SimpleStatisticPage>().SelectLastest();
+                rootWindow.GetChildWindow<SimpleHomePage>().Toggle(SimpleHomePage.StatisticPageId);
+                rootWindow.GetChildWindow<SimpleStatisticPage>().SelectLastest();
 
-                GamePlay.lastGameStats = null;
+                Gameplay.lastGameStats = null;
             }
         }
     }

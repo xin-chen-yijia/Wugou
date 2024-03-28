@@ -7,6 +7,7 @@ using UnityEngine;
 
 using Mirror;
 using Mirror.Discovery;
+
 namespace Wugou.Multiplayer
 {
     public struct MultiplayerServerRequest : NetworkMessage { }
@@ -25,7 +26,8 @@ namespace Wugou.Multiplayer
 
         // gamepaly info
         public string playerName;
-        public string gameMap;
+        public string gameMapPackage;
+        public string gameMapMd5;
         public int curPlayerCount;
         public int maxPlayerCount;
     }
@@ -54,16 +56,18 @@ namespace Wugou.Multiplayer
 
             try
             {
+                var package = MultiplayerGameManager.instance.gameMapPackage;
                 // this is an example reply message,  return your own
                 // to include whatever is relevant for your game
                 return new MultiplayerServerResponse
                 {
                     serverId = ServerId,
                     uri = transport.ServerUri(),
-                    playerName = GamePlay.loginInfo.name,
-                    gameMap = MultiplayerGameManager.instance.selectedGameMap.name,
-                    curPlayerCount = MultiplayerGameManager.instance.roomplayers.Count,
-                    maxPlayerCount = MultiplayerGameManager.instance.gameMap.maxPlayerCount
+                    playerName = Authorization.activeUser?.name,
+                    gameMapPackage = package.name,
+                    gameMapMd5 = package.gameMap.timestamp.ToString(),  // 用时间戳代替
+                    curPlayerCount = MultiplayerRoomPlayer.allPlayers.Count,
+                    maxPlayerCount = package.gameMap.maxPlayerCount
                 };
             }
             catch (NotImplementedException)

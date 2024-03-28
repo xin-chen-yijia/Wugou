@@ -60,37 +60,14 @@ namespace Wugou
         public float Revs { get; private set; }
         public float AccelInput { get; private set; }
 
+        private void Awake()
+        {
+            m_Rigidbody = GetComponent<Rigidbody>();
+        }
+
         // Use this for initialization
         private void Start()
         {
-            ManualInit();
-        }
-
-        public bool isInit { get; private set; } = false;
-
-        /// <summary>
-        /// 车辆有可能动态实例化，对于初始化的时间有要求
-        /// </summary>
-        public void ManualInit()
-        {
-            if (isInit || !transform.Find("Body"))
-            {
-                return;
-            }
-
-            isInit = true;
-            // 应对动态生成的物体
-            m_WheelColliders[0] = transform.Find("Body/WheelColliders/FrontRight").GetComponent<WheelCollider>();
-            m_WheelColliders[1] = transform.Find("Body/WheelColliders/FrontLeft").GetComponent<WheelCollider>();
-            m_WheelColliders[2] = transform.Find("Body/WheelColliders/BackRight").GetComponent<WheelCollider>();
-            m_WheelColliders[3] = transform.Find("Body/WheelColliders/BackLeft").GetComponent<WheelCollider>();
-
-            m_WheelMeshes[0] = transform.Find("Body/WheelModels/wheelFR").gameObject;
-            m_WheelMeshes[1] = transform.Find("Body/WheelModels/wheelFL").gameObject;
-            m_WheelMeshes[2] = transform.Find("Body/WheelModels/wheelBR").gameObject;
-            m_WheelMeshes[3] = transform.Find("Body/WheelModels/wheelBL").gameObject;
-
-
             m_WheelMeshLocalRotations = new Quaternion[4];
             for (int i = 0; i < 4; i++)
             {
@@ -100,10 +77,8 @@ namespace Wugou
 
             m_MaxHandbrakeTorque = float.MaxValue;
 
-            m_Rigidbody = GetComponent<Rigidbody>();
             m_CurrentTorque = m_FullTorqueOverAllWheels - (m_TractionControl * m_FullTorqueOverAllWheels);
         }
-
 
         private void GearChanging()
         {
@@ -161,11 +136,6 @@ namespace Wugou
 
         public void Move(float steering, float accel, float footbrake, float handbrake)
         {
-            if (!isInit)
-            {
-                return;
-            }
-
             for (int i = 0; i < 4; i++)
             {
                 Quaternion quat;
@@ -392,14 +362,16 @@ namespace Wugou
 
         private bool AnySkidSoundPlaying()
         {
-            for (int i = 0; i < 4; i++)
-            {
-                //if (m_WheelEffects[i].PlayingAudio)
-                {
-                    return true;
-                }
-            }
-            return false;
+            //for (int i = 0; i < 4; i++)
+            //{
+            //    if (m_WheelEffects[i].PlayingAudio)
+            //    {
+            //        return true;
+            //    }
+            //}
+            //return false;
+
+            return true;
         }
     }
 }
