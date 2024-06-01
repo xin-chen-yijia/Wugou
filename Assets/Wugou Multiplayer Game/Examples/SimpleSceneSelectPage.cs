@@ -82,7 +82,11 @@ namespace Wugou.Examples.UI
             Utils.FillContent(sceneItemContainer, sceneItemPrefab, scenes, (go, card) =>
             {
                 go.transform.Find("Name/Name").GetComponent<TMP_Text>().text = card.name;
-                ReadAndAssignIcon(go.transform.Find("Icon").GetComponent<Image>(), card.thumbnail);
+                Utils.DoAsync(async () =>
+                {
+                    var tex = await GameAssetDatabase.GetAssetAsync<Texture2D>(card.thumbnail);
+                    go.transform.Find("Icon").GetComponent<Image>().sprite = Utils.CreateSprite(tex);
+                });
                 var button = go.transform.Find("Button").GetComponent<Button>();
                 button.onClick.AddListener(() =>
                 {
@@ -120,11 +124,6 @@ namespace Wugou.Examples.UI
             await new YieldInstructionAwaiter(null);
             _ = Utils.ResizeContainer(sceneItemContainer);
 
-        }
-
-        private async void ReadAndAssignIcon(Image img,string icon)
-        {
-            img.sprite = await GameAssetDatabase.GetAssetAsync<Sprite>(icon);
         }
     }
 

@@ -99,6 +99,7 @@ namespace Wugou.Assetbundle
         {
             AssetBundleDescFile buildInfo = new AssetBundleDescFile();
             buildInfo.unityVersion = Application.unityVersion;
+            buildInfo.wugouVersion = Wugou.PackageInformation.latestVersion;
             buildInfo.createTime = string.Format("{0}", DateTime.Now.ToLocalTime());
 
             string[] assetBundleNames = AssetDatabase.GetAllAssetBundleNames();

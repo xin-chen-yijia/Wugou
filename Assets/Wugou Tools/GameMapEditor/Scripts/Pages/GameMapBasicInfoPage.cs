@@ -40,7 +40,7 @@ namespace Wugou.Editor.UI
                     GameMapEditor.instance.loadedGameMap.name = filename;
                     GameMapEditor.instance.loadedGameMap.description = transform.Find("Main/Description").GetComponentInChildren<TMP_InputField>().text;
                    
-                    if (GameMapEditor.instance.Save(filename))
+                    if (GameMapEditor.instance.Save())
                     {
                         // µ¥´Î´¥·¢
                         onSaveGameMap.Invoke();

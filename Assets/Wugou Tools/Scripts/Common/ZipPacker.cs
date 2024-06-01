@@ -339,25 +339,34 @@ namespace Wugou
         /// <returns></returns>
         public byte[] Read(string zipFilePath, string entryName)
         {
-            using (var zipToOpen = new FileStream(zipFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            try
             {
-                using (var archive = new ZipArchive(zipToOpen, ZipArchiveMode.Read, true, Encoding.GetEncoding(entryNameEncoding)))
+                using (var zipToOpen = new FileStream(zipFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
-                    var count = archive.Entries.Count;
-                    for (int i = 0; i < count; i++)
+                    using (var archive = new ZipArchive(zipToOpen, ZipArchiveMode.Read, true, Encoding.GetEncoding(entryNameEncoding)))
                     {
-                        var entry = archive.Entries[i];
-                        if (!entry.FullName.EndsWith("/") &&  entry.FullName == entryName)
+                        var count = archive.Entries.Count;
+                        for (int i = 0; i < count; i++)
                         {
-                            var content = new byte[entry.Length];
-                            entry.Open().Read(content, 0, content.Length);
-                            return content;
+                            var entry = archive.Entries[i];
+                            if (!entry.FullName.EndsWith("/") && entry.FullName == entryName)
+                            {
+                                var content = new byte[entry.Length];
+                                entry.Open().Read(content, 0, content.Length);
+                                return content;
+                            }
                         }
                     }
                 }
+
+                return null;
+            }
+            catch(Exception e)
+            {
+                Logger.Error(e);
+                return null; 
             }
 
-            return null;
         }
 
         #endregion

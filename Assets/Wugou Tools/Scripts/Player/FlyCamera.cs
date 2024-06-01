@@ -120,16 +120,16 @@ namespace Wugou
             if (Input.GetMouseButton(1))
             {
                 parentTrans_.Translate(hx * tSpeed, hy * tSpeed, hz * tSpeed, Space.Self);
-            }
 
-            if (Input.GetKey(KeyCode.Q))
-            {
-                parentTrans_.Translate(0.0f, -tSpeed * 0.35f, 0.0f, Space.Self);
-            }
+                if (Input.GetKey(KeyCode.Q))
+                {
+                    parentTrans_.Translate(0.0f, -tSpeed * 0.35f, 0.0f, Space.Self);
+                }
 
-            if (Input.GetKey(KeyCode.E))
-            {
-                parentTrans_.Translate(0.0f, tSpeed * 0.35f, 0.0f, Space.Self);
+                if (Input.GetKey(KeyCode.E))
+                {
+                    parentTrans_.Translate(0.0f, tSpeed * 0.35f, 0.0f, Space.Self);
+                }
             }
 
             // 旋转
@@ -147,6 +147,10 @@ namespace Wugou
                 parentTrans_.rotation = Quaternion.Euler(0, xAngle, 0) * parentTrans_.rotation;
                 parentTrans_.Rotate(yAngle, 0, 0, Space.Self);
             }
+
+            // 滚轮
+            float scrollValue = Input.GetAxis("Mouse ScrollWheel");
+            parentTrans_.Translate(0, 0, scrollValue * 300 * tSpeed, Space.Self);
         }
 
         /// <summary>

@@ -35,7 +35,7 @@ namespace Wugou.Editor.UI
                     }
 
                     GameMapEditor.instance.loadedGameMap.name = filename;                 
-                    if (GameMapEditor.instance.Save(filename))
+                    if (GameMapEditor.instance.Save())
                     {
                         Gameplay.loadedGameMapFile = filename;
                         okAction_?.Invoke();

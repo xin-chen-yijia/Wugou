@@ -4,6 +4,13 @@ using UnityEngine;
 
 namespace Wugou
 {
+    /// <summary>
+    /// 广告牌
+    /// 注意：target使用的是transform，所以对使用了rigidbody，同时启用了interplote的物体表现会有延迟（帧率越低延迟越大）
+    /// 解决方案：
+    /// 1. target使用rigidbody的位置；
+    /// 2. 关闭rigidbody的插值；
+    /// </summary>
     public class Billboard : MonoBehaviour
     {
         public Transform target;
@@ -19,10 +26,14 @@ namespace Wugou
                 if(!cam)
                 {
                     var cameras = GameObject.FindObjectsOfType<Camera>();
-                    cam = cameras[0];
+                    if(cameras.Length > 0 )
+                    {
+                        cam = cameras[0];
+                    }
                 }
                 target = cam?.transform;
             }
+
         }
 
         // Update is called once per frame

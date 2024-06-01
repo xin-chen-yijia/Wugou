@@ -79,13 +79,13 @@ namespace Wugou.Editor
         {
             var entity = GameWorld.GetGameEntity(id_);
             Debug.Assert(entity != null);
-            serializedContent_ = JsonConvert.SerializeObject(entity, JsonSerializerGlobal.commonConverts);
+            serializedContent_ = JsonConvert.SerializeObject(entity, JsonSerializerGlobal.commonSerializerSettings);
         }
 
         public override async Task<bool> Load()
         {
             Debug.Assert(!string.IsNullOrEmpty(serializedContent_));
-            var entity = JsonConvert.DeserializeObject<GameEntity>(serializedContent_, JsonSerializerGlobal.commonConverts);
+            var entity = JsonConvert.DeserializeObject<GameEntity>(serializedContent_, JsonSerializerGlobal.commonSerializerSettings);
             Debug.Assert(entity.id == id_);
 
             await entity.InstantiateBody();
@@ -231,7 +231,7 @@ namespace Wugou.Editor
             this.id_ = id;
 
             var entity = GameWorld.GetGameEntity(id);
-            serializedContent_ = JsonConvert.SerializeObject(entity, JsonSerializerGlobal.commonConverts);
+            serializedContent_ = JsonConvert.SerializeObject(entity, JsonSerializerGlobal.commonSerializerSettings);
         }
 
         public override Task<bool> Load()
@@ -245,7 +245,7 @@ namespace Wugou.Editor
         public override async Task<bool> Revert()
         {
             Debug.Assert(!string.IsNullOrEmpty(serializedContent_));
-            var entity = JsonConvert.DeserializeObject<GameEntity>(serializedContent_, JsonSerializerGlobal.commonConverts);
+            var entity = JsonConvert.DeserializeObject<GameEntity>(serializedContent_, JsonSerializerGlobal.commonSerializerSettings);
             Debug.Assert(entity.id == id_);
 
             await entity.InstantiateBody();

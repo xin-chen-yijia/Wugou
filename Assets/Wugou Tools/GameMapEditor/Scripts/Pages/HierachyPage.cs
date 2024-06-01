@@ -20,8 +20,15 @@ namespace Wugou.Editor.UI
 
         private void OnSelectGameEntity(GameEntity obj)
         {
-
-            if (itemsMap_.ContainsKey(obj))
+            if(obj == null)
+            {
+                if (lastCheckObj != null)
+                {
+                    lastCheckObj?.SetActive(false);
+                    lastCheckObj = null;
+                }
+            }
+            else if (itemsMap_.ContainsKey(obj))
             {
                 if (lastCheckObj != null)
                 {
@@ -71,7 +78,7 @@ namespace Wugou.Editor.UI
         private void OnLoadedGameMap()
         {
             // ÓÃGameWorldµÄEntityÌî³ä
-            Utils.FillContent(itemContainer, itemPrefab, GameWorld.gameEntities, (go, entity) =>
+            Utils.FillContent(itemContainer, itemPrefab, GameWorld.gameEntities.FindAll((entity) => !entity.isStatic), (go, entity) =>
             {
                 AddObject(go, entity);
             });
@@ -141,8 +148,7 @@ namespace Wugou.Editor.UI
             }
 
             int entityId = entity.id;
-
-            GameMapEditor.TransactionScope.activeTransaction.Record(new CommonObjectRecord(() =>
+            GameMapEditor.TransactionScope.activeTransaction?.Record(new CommonObjectRecord(() =>
             {
                 var tmp = GameWorld.GetGameEntity(entityId);
                 Debug.Assert(tmp != null);

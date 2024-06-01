@@ -196,6 +196,7 @@ namespace Wugou
         private float m_NextStep;
         private bool m_Jumping;
         private AudioSource m_AudioSource;
+        private Animator m_Animator;
 
         // Use this for initialization
         private void Start()
@@ -210,6 +211,8 @@ namespace Wugou
             m_Jumping = false;
             m_AudioSource = GetComponent<AudioSource>();
             mouseLook.Init(transform, m_Camera.transform);
+
+            m_Animator = GetComponent<Animator>();
         }
 
 
@@ -217,6 +220,7 @@ namespace Wugou
         private void Update()
         {
             RotateView();
+
             // the jump state needs to read here to make sure it is not missed
             if (!m_Jump)
             {
@@ -282,10 +286,20 @@ namespace Wugou
             }
             m_CollisionFlags = m_CharacterController.Move(m_MoveDir * Time.fixedDeltaTime);
 
+            //// update the animator parameters
+            //var turn = Mathf.Atan2(m_MoveDir.x, m_MoveDir.z);
+            //var forward = new Vector3(m_MoveDir.x, turn, m_MoveDir.z).magnitude;
+            //m_Animator.SetFloat("Forward", forward, 0.1f, Time.deltaTime);
+            //m_Animator.SetFloat("Turn", m_TurnAmount, 0.1f, Time.deltaTime);
+            //m_Animator.SetBool("Crouch", m_Crouching);
+            //m_Animator.SetBool("OnGround", m_IsGrounded);
+            //if (!m_IsGrounded)
+            //{
+            //    m_Animator.SetFloat("Jump", m_Rigidbody.velocity.y);
+            //}
+
             ProgressStepCycle(speed);
             UpdateCameraPosition(speed);
-
-            mouseLook.UpdateCursorLock();
         }
 
 

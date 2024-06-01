@@ -1,5 +1,4 @@
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Wugou.UI;
 using Wugou.Editor.UI;
 using System;
@@ -52,7 +51,7 @@ namespace Wugou.Editor
         public GameMapProj currentProj { get; private set; }
 
         // 场景脚本
-        public GameMap loadedGameMap { get; private set; }
+        public GameMap loadedGameMap => currentProj?.gameMap;
 
         // 坐标轴
         public EditorAxis editorAxis;
@@ -85,10 +84,19 @@ namespace Wugou.Editor
         [HideInInspector]
         public Camera previewCamera;
 
-        public int terrainLayer;    //地形所在层
+        private int selectableMask;    // 可选物体层标记
+
         public float maxRayDistance = 1000;
 
         private GameEntity currentPickedGameEntity_; // 要放置的物体
+
+        /// <summary>
+        /// 用于判断鼠标是否在操作场景的区域
+        /// </summary>
+        public bool isPointerInSceneView { get; private set; } = true;
+
+        // 标识是否正在输入
+        private bool isFocusedOnInputComponent_ = false;
 
         // 当前选择的物体
         public GameObject selectedObject
@@ -97,6 +105,12 @@ namespace Wugou.Editor
             private set;
         }
         public GameEntity selectedEntity => GetGameEntity(selectedObject);
+
+        /// <summary>
+        /// 在贴地模式下，放置物体是否朝向法线
+        /// </summary>
+        public bool placeGameEntityForwardHitNormal { get; set; } = false;
+
 
         // 可拖放物体信息
         private List<EditorAssetItemGroup> draggableAssets_ = new List<EditorAssetItemGroup>();
@@ -116,6 +130,8 @@ namespace Wugou.Editor
         /// Undo/Redo 系统
         /// </summary>
         public Transactor Undo { get; private set; } = new Transactor();
+
+        private int cachedUndoIndex_ = -1;    // 用于判断当前是否变更了
 
         /// <summary>
         /// 类似c++的LockGuard,即RAII的思想
@@ -253,6 +269,8 @@ namespace Wugou.Editor
         {
             Debug.Assert(instance == null);
             instance = this;
+
+            selectableMask = (0xFFFF & ~(1 << mapGizmosLayer));
         }
 
         // Start is called before the first frame update
@@ -277,7 +295,7 @@ namespace Wugou.Editor
 
             // 坐标轴
             editorAxis.editorCamera = editorCamera;
-            editorAxis.mainLayerMask = 1 << mapEditorLayer;
+            editorAxis.layer = 1 << mapEditorLayer;
 
             // 框选，不用UI的原因是UI更新会影响Unity的主流程，比如Input.GetMouseButtonUp的判定
             frameMesh_ = new Mesh();
@@ -312,12 +330,63 @@ namespace Wugou.Editor
             EnableOutline();    
         }
 
-        private bool isOnUI_ = false;
-        private bool isMousePress_ = false;
-
         // Update is called once per frame
         public virtual void Update()
         {
+            CheckUIState();
+
+            ApplyShortcutKeys();
+
+            // 鼠标在UI上时，禁止一些三维操作 
+            if (!isPointerInSceneView)
+            {
+                // 锁住相机
+                LockEditorCamera();
+            }
+            else
+            {
+                UnlockEditorCamera();
+
+                // 物体选择等操作
+                ObjectOptionalInternal();
+            }
+        }
+
+        #endregion
+
+        /// <summary>
+        /// 检查UI状态，判断当前是否正在操作UI，因为会影响选择物体、快捷键等功能
+        /// </summary>
+        private void CheckUIState()
+        {
+            // 不在UI上，则是在操作三维场景
+            isPointerInSceneView = !EventSystem.current.IsPointerOverGameObject();
+
+            if(Input.GetMouseButtonUp(0))
+            {
+                // 输入时需要禁用快捷键
+                if(EventSystem.current.currentSelectedGameObject && (EventSystem.current.currentSelectedGameObject.GetComponent<UnityEngine.UI.InputField>() != null || EventSystem.current.currentSelectedGameObject.GetComponent<TMPro.TMP_InputField>()))
+                {
+                    isFocusedOnInputComponent_ = true;
+                }
+                else
+                {
+                    isFocusedOnInputComponent_ = false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 快捷键
+        /// </summary>
+        private void ApplyShortcutKeys()
+        {
+            // 正在输入，不响应快捷键
+            if (isFocusedOnInputComponent_)
+            {
+                return;
+            }
+
             if (Input.GetKeyDown(KeyCode.Delete))
             {
                 if (selectedEntity)
@@ -340,7 +409,7 @@ namespace Wugou.Editor
 
             }
 
-            if((Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) && Input.GetKeyDown(KeyCode.Z))
+            if ((Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) && Input.GetKeyDown(KeyCode.Z))
             {
                 Undo.Undo();
             }
@@ -351,7 +420,7 @@ namespace Wugou.Editor
             }
 
             // duplicate
-            if ((Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) && Input.GetKeyDown(KeyCode.D))
+            if (selectedEntity && !selectedEntity.isStatic && (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) && Input.GetKeyDown(KeyCode.D))
             {
                 DuplicateGameEntity(selectedEntity);
             }
@@ -365,61 +434,49 @@ namespace Wugou.Editor
                 }
                 else
                 {
-                    Save(Gameplay.loadedGameMapFile);
+                    Save();
                 }
             }
 
-            if (!isMousePress_)
+            if (!Input.GetMouseButton(1))   // 按住右键的时候屏蔽
             {
-                isOnUI_ = EventSystem.current.IsPointerOverGameObject(); 
-            }
-
-            if (Input.GetMouseButtonDown(0))
-            {
-                isMousePress_ = true;
-            }
-
-            if(Input.GetMouseButtonUp(0))
-            {
-                isMousePress_ = false;
-            }
-
-            // 鼠标在UI上时，禁止一些三维操作 
-            if (isOnUI_)
-            {
-                // 锁住相机
-                LockEditorCamera(0);
-                return;
-            }
-            else
-            {
-                UnlockEditorCamera(0);
-            }
-
-            // 没有相机时不操作
-            if (!editorCamera)
-            {
-                return;
-            }
-
-            if (Input.GetKeyUp(KeyCode.F))
-            {
-                if (selectedEntity != null)
+                if (Input.GetKeyDown(KeyCode.Q))
                 {
-                    if (lookAtCoroutine_ != null)
-                    {
-                        StopCoroutine(lookAtCoroutine_);
-                    }
-                    lookAtCoroutine_ = StartCoroutine(LookAtTarget(selectedEntity.gameObject.transform));
+                    SwitchOptionMode(OptionModel.kView);
+                }
+
+                if (Input.GetKeyDown(KeyCode.W))
+                {
+                    SwitchOptionMode(OptionModel.kTranslate);
+                }
+
+                if (Input.GetKey(KeyCode.E))
+                {
+                    SwitchOptionMode(OptionModel.kRotate);
+                }
+
+                if (Input.GetKey(KeyCode.R))
+                {
+                    SwitchOptionMode(OptionModel.kScale);
                 }
             }
 
-            // 物体选择等操作
-            ObjectOptionalInternal();
-
+            if (isPointerInSceneView)
+            {
+                // 快捷键， 鼠标在三维场景上时响应
+                if (Input.GetKeyUp(KeyCode.F))
+                {
+                    if (selectedEntity != null)
+                    {
+                        if (lookAtCoroutine_ != null)
+                        {
+                            StopCoroutine(lookAtCoroutine_);
+                        }
+                        lookAtCoroutine_ = StartCoroutine(LookAtTarget(selectedEntity.gameObject.transform));
+                    }
+                }
+            }
         }
-
-        #endregion
 
         public async Task<bool> LoadGameMap(GameMap map)
         {
@@ -432,7 +489,6 @@ namespace Wugou.Editor
 
                 DaemonUI.loadingPage.SetProgress(1.0f);
 
-
                 // 等一些插件或者脚本执行初始化
                 await new YieldInstructionAwaiter(null).Task;
 
@@ -440,6 +496,14 @@ namespace Wugou.Editor
                 foreach(var v in GameObject.FindObjectsOfType<Rigidbody>())
                 {
                     v.isKinematic = true;
+                }
+
+                // 
+                foreach(var v in GameWorld.gameEntities)
+                {
+                    Utils.SetLayerRecursively(v.gameObject, mapEditorLayer);
+                    //v.layer = mapEditorLayer;
+
                 }
 
                 // 预览摄像机用场景中带的
@@ -474,9 +538,6 @@ namespace Wugou.Editor
                 //        await GameAssetDatabase.GetAssetAsync<GameObject>(groupDesc.items[0].asset);
                 //    }
                 //}
-
-                //
-                loadedGameMap = map;
 
                 return true;
             }
@@ -523,7 +584,7 @@ namespace Wugou.Editor
             // Resources/editor
             foreach(var path in Directory.GetDirectories($"{Gameplay.resourcePath}/editor"))
             {
-                instance.ImportAssets(path);
+                instance.ImportAssetPackage(path);
             }
             // order
             instance.draggableAssets_.Sort((a, b) => { 
@@ -535,8 +596,12 @@ namespace Wugou.Editor
             foreach (var v in mapProj.packages)
             {
                 var path = $"{mapProj.path}/{v}";
-                await GameAssetDatabase.MountAssetBundle($"/{v}", path);
-                instance.ImportAssets(path);
+                if (GameAssetDatabase.IsAssetbundle(path))
+                {
+                    await GameAssetDatabase.MountAssetBundle($"/{v}", path);
+                }
+
+                instance.ImportAssetPackage(path);
             }
 
             // loading page
@@ -608,16 +673,21 @@ namespace Wugou.Editor
         }
 
         /// <summary>
-        /// 读取资产内容
+        /// 导入资产包，包括普通文件夹和AB包两种类型
         /// </summary>
         /// <param name="path"></param>
         /// <param name="copyToProj">是否拷贝资产到当前GameMap目录</param>
         /// <returns></returns>
-        public EditorAssetItemGroup ImportAssets(string path, bool copyToProj = false)
+        public EditorAssetItemGroup ImportAssetPackage(string path, bool copyToProj = false)
         {
+            var contentFile = $"{path}/{kContentFileName}";
+            if(!File.Exists(contentFile))
+            {
+                return null;
+            }
+
             // load prefab description
-            var content = System.IO.File.ReadAllText($"{path}/{kContentFileName}");
-            print(path);
+            var content = System.IO.File.ReadAllText(contentFile);
             var assets = JsonConvert.DeserializeObject<EditorAssetItemGroup>(content);
             draggableAssets_.Add(assets);
 
@@ -634,6 +704,32 @@ namespace Wugou.Editor
             }
 
             return assets;
+        }
+
+        /// <summary>
+        /// 删除已导入的包
+        /// </summary>
+        /// <param name="packageName"></param>
+        public void DeleteAssetPackage(string packageName)
+        {
+            var path = $"{currentProj.path}/{packageName}";
+            var contentFile = $"{path}/{kContentFileName}";
+            if (Directory.Exists(path) && File.Exists(contentFile))
+            {
+                var content = System.IO.File.ReadAllText(contentFile);
+                var assets = JsonConvert.DeserializeObject<EditorAssetItemGroup>(content);
+                for(int i=draggableAssets_.Count-1; i>=0; i--)
+                {
+                    if (draggableAssets_[i].name == assets.name)
+                    {
+                        draggableAssets_.RemoveAt(i);
+                        break;
+                    }
+                }
+
+                Directory.Delete(path, true);
+            }
+
         }
 
         /// <summary>
@@ -654,7 +750,11 @@ namespace Wugou.Editor
             }
 
             var entity = CreateGameEntity(assetItem);
+            PickUp(entity);
+        }
 
+        private void PickUp(GameEntity entity)
+        {
             // undo record
             Undo.BeginTransaction();
             Undo.Record(new EditorCreateGameEntity(entity.id));
@@ -662,6 +762,8 @@ namespace Wugou.Editor
             // pickup
             currentPickedGameEntity_ = entity;
             currentPickedGameEntity_.SetActive(false); // 先隐藏， 鼠标到地面上时才显示
+
+            HandleCollidersWhenPickUp(currentPickedGameEntity_);
         }
 
         public void PutDown()
@@ -681,6 +783,8 @@ namespace Wugou.Editor
                 currentPickedGameEntity_ = null;
 
                 Undo.EndTransaction();  // 这个地方有两种情况：创建物体和移动物体
+
+                HandleCollidersWhenPutdown();
             }
         }
 
@@ -700,6 +804,49 @@ namespace Wugou.Editor
             return entity;
         }
 
+        private List<Collider> selectedEntityColliders_ = new List<Collider>(); // 用于还原
+
+        /// <summary>
+        /// 在拾取物体时，把Entity的碰撞去掉，否则无法选择地面
+        /// </summary>
+        /// <param name="entity"></param>
+        private async void HandleCollidersWhenPickUp(GameEntity entity)
+        {
+            // 等待body
+            await new EnumeratorAwaiter(WaitGameEnityBody(entity));
+
+            // 不在放下的时候清除是因为未放下前物体可能被清除了。。。
+            selectedEntityColliders_.Clear();   
+
+            // 选中后collider禁用，避免干扰射线
+            foreach (var v in entity.GetComponentsInChildren<Collider>())
+            {
+                if (v.enabled)
+                {
+                    v.enabled = false;
+                    selectedEntityColliders_.Add(v);
+                }
+            }
+        }
+
+        IEnumerator WaitGameEnityBody(GameEntity entity)
+        {
+            while (!string.IsNullOrEmpty(entity.asset) && !entity.body)
+            {
+                yield return null;
+            }
+        }
+
+        private void HandleCollidersWhenPutdown()
+        {
+            //
+            foreach (var v in selectedEntityColliders_)
+            {
+                v.enabled = true;
+            }
+        }
+
+
         private void SelectObjectInternal(GameObject obj)
         {
             // update axis
@@ -718,7 +865,10 @@ namespace Wugou.Editor
                 {
                     if (GameWorld.ExistsEntity(entity))
                     {
-                        editorAxis.SetSelectedObject(entity.gameObject);
+                        if (!entity.isStatic)
+                        {
+                            editorAxis.SetSelectedObject(entity.gameObject);
+                        }
 
                         // 
                         onSelectGameEntity?.Invoke(entity);
@@ -735,10 +885,15 @@ namespace Wugou.Editor
                         Logger.Error($"{entity.name} not exists in GameWorld....");
                     }
                 }
+                else
+                {
+                    onSelectGameEntity?.Invoke(null);
+                }
 
             }
             else
             {
+                onSelectGameEntity?.Invoke(null);
                 // 显示属性
                 uiRootWindow.GetChildWindow<InspectorPage>().SetTarget(null);
                 uiRootWindow.GetChildWindow<InspectorPage>().Show();
@@ -757,11 +912,13 @@ namespace Wugou.Editor
             // 记录，用于添加到脚本中
             string prototype = assetItem.type;
             var entity = GameWorld.AddGameEntity(assetItem.asset, assetItem.type);
-            entity.gameObject.layer = mapEditorLayer;
+            entity.layer = mapEditorLayer;
 
             Utils.DoAsync(async () =>
             {
                 await entity.InstantiateBody();
+
+                Utils.SetLayerRecursively(entity.gameObject,mapEditorLayer);
 
                 // 显示选中状态
                 SetOutlineEnabled(entity.gameObject, true);
@@ -794,13 +951,20 @@ namespace Wugou.Editor
             GameWorld.DestroyGameEntity(entity);
         }
 
-
+        /// <summary>
+        /// 复制物体
+        /// </summary>
+        /// <param name="entity"></param>
+        /// <returns></returns>
         public GameEntity DuplicateGameEntity(GameEntity entity)
         {
             var newEntity = GameEntityManager.DuplicateGameEntity(entity);
             GameWorld.AddExistGameEntity(newEntity);
 
             onGameEntityAdd?.Invoke(newEntity);
+
+            SelectGameEntity(newEntity);
+
             return newEntity;
         }
 
@@ -809,12 +973,15 @@ namespace Wugou.Editor
             curOptionMode_ = mode;
 
             // 鼠标样式修改
-            editorAxis.SetOptionMode((EditorAxis.Mode)(mode));
-            editorAxis.enabled = (mode == OptionModel.kTranslate || mode == OptionModel.kRotate || mode == OptionModel.kScale);
             if(mode == OptionModel.kAttach || mode == OptionModel.kView)
             {
                 editorAxis.SetOptionModeWithoutNotify(EditorAxis.Mode.kNone);
             }
+            else
+            {
+                editorAxis.SetOptionMode((EditorAxis.Mode)(mode));
+            }
+            editorAxis.enabled = (mode == OptionModel.kTranslate || mode == OptionModel.kRotate || mode == OptionModel.kScale);
 
             // 鼠标控制视角移动只能在view模式
             if(flyCamera_)
@@ -858,18 +1025,28 @@ namespace Wugou.Editor
         /// </summary>
         void ObjectOptionalInternal()
         {
+            // 没有相机时不操作
+            if (!editorCamera)
+            {
+                return;
+            }
+
             RaycastHit hit;
             Ray ray = editorCamera.ScreenPointToRay(Input.mousePosition);
             if (currentPickedGameEntity_)
             {
-                if (Physics.Raycast(ray, out hit, maxRayDistance, 1 << terrainLayer))
+                if (Physics.Raycast(ray, out hit, maxRayDistance, selectableMask))
                 {
+                    print(hit.collider.gameObject);
                     currentPickedGameEntity_.transform.position = hit.point;
-                    currentPickedGameEntity_.transform.up = hit.normal;
+                    if (placeGameEntityForwardHitNormal)
+                    {
+                        currentPickedGameEntity_.transform.up = hit.normal;
+                    }
                     currentPickedGameEntity_.SetActive(true);
                 }
 
-                if (Input.GetMouseButtonDown(0))
+                if (Input.GetMouseButtonUp(0))
                 {
                     // 放下物体
                     PutDown();
@@ -882,39 +1059,23 @@ namespace Wugou.Editor
             {
                 if (Input.GetMouseButtonDown(0))
                 {
-                    if (Physics.Raycast(ray, out hit, maxRayDistance, 1 << mapEditorLayer))
+                    RaycastGameEntity();
+
+                    if (selectedEntity)
                     {
-                        Undo.BeginTransaction();
-                        if (selectedEntity)
-                        {
-                            Undo.Record(new EditorSelectGameEntity());
-                        }
-
-                        SelectObjectInternal(hit.collider.gameObject);
-
-                        if (selectedEntity)
-                        {
-                            isMovingGameEntity_ = true;
-                            Undo.Record(new EditorMoveGameEntity(selectedEntity.id));
-                        }
+                        HandleCollidersWhenPickUp(selectedEntity);
                     }
-                    else
-                    {
-                        using (var transaction = new TransactionScope())
-                        {
-                            transaction.Record(new EditorSelectGameEntity());
-
-                            SelectObjectInternal(null);
-                        }
-                    }
-
                 }
 
                 // 物体随鼠标走
-                if (Input.GetMouseButton(0) && selectedEntity != null && Physics.Raycast(ray, out hit, maxRayDistance, 1 << terrainLayer))
+                if (Input.GetMouseButton(0) && selectedEntity != null && !selectedEntity.isStatic && Physics.Raycast(ray, out hit, maxRayDistance, selectableMask))
                 {
                     selectedEntity.position = hit.point;
-                    selectedEntity.transform.up = hit.normal;
+                    if (placeGameEntityForwardHitNormal)
+                    {
+                        selectedEntity.transform.up = hit.normal;
+                    }
+
                 }
 
                 if (Input.GetMouseButtonUp(0))
@@ -923,6 +1084,8 @@ namespace Wugou.Editor
                     {
                         isMovingGameEntity_ = false;
                         Undo.EndTransaction();  // 移动完成
+
+                        HandleCollidersWhenPutdown();
                     }
                 }
 
@@ -945,11 +1108,17 @@ namespace Wugou.Editor
                     Undo.EndTransaction();
                 }
 
-                if (editorAxis.isDraggingAxis)     // 先判断是否在操作坐标轴
+                // 选择物体
+                if (editorAxis.activeAxisName == EditorAxis.kEmptyAxisName && Input.GetMouseButtonUp(0))
                 {
-                    isShowFrameSelect = false;
-                    return;
+                    RaycastGameEntity();
                 }
+
+                //if (editorAxis.isDraggingAxis)     // 先判断是否在操作坐标轴
+                //{
+                //    isShowFrameSelect = false;
+                //    return;
+                //}
 
                 if (!isShowFrameSelect)
                 {
@@ -1044,11 +1213,44 @@ namespace Wugou.Editor
         }
 
         /// <summary>
+        /// 射线选择GameEntity
+        /// </summary>
+        private void RaycastGameEntity()
+        {
+            RaycastHit hit;
+            Ray ray = editorCamera.ScreenPointToRay(Input.mousePosition);
+            if (Physics.Raycast(ray, out hit, maxRayDistance, 1 << mapEditorLayer))
+            {
+                Undo.BeginTransaction();
+                if (selectedEntity)
+                {
+                    Undo.Record(new EditorSelectGameEntity());
+                }
+
+                SelectObjectInternal(hit.collider.gameObject);
+
+                if (selectedEntity)
+                {
+                    isMovingGameEntity_ = true;
+                    Undo.Record(new EditorMoveGameEntity(selectedEntity.id));
+                }
+            }
+            else
+            {
+                using (var transaction = new TransactionScope())
+                {
+                    transaction.Record(new EditorSelectGameEntity());
+
+                    SelectObjectInternal(null);
+                }
+            }
+        }
+
+        /// <summary>
         /// 保存
         /// </summary>
-        /// <param name="fileName"></param>
         /// <returns></returns>
-        public bool Save(string fileName)
+        public bool Save()
         {
             if(GameWorld.GetStartPositionCount() == 0)
             {
@@ -1057,11 +1259,20 @@ namespace Wugou.Editor
                 return false;
             }
 
+            cachedUndoIndex_ = Undo.GetIndex();
+
             // 天气写入
-            loadedGameMap.weather = WeatherSystem.activeWeather;
+            loadedGameMap.weather = new WeatherDesc()
+            {
+                type = Gameplay.weatherSystem.weatherType,
+                time = Gameplay.weatherSystem.time,
+                fogDensity = Gameplay.weatherSystem.fogDensity,
+                windDir = Gameplay.weatherSystem.windDirection,
+                windForce = Gameplay.weatherSystem.windForce,
+            };
 
             // 保存工程
-            Gameplay.gameMapProjManager.Save(currentProj.name, currentProj);
+            currentProj.Save();
 
             onSave.Invoke();
 
@@ -1070,8 +1281,18 @@ namespace Wugou.Editor
 
         public void BuildGameMap()
         {
+            // 保存
+            Save();
+
             // 天气写入
-            loadedGameMap.weather = WeatherSystem.activeWeather;
+            loadedGameMap.weather = new WeatherDesc()
+            {
+                type = Gameplay.weatherSystem.weatherType,
+                time = Gameplay.weatherSystem.time,
+                fogDensity = Gameplay.weatherSystem.fogDensity,
+                windDir = Gameplay.weatherSystem.windDirection,
+                windForce = Gameplay.weatherSystem.windForce,
+            };
 
             currentProj.Build();
 
@@ -1083,7 +1304,7 @@ namespace Wugou.Editor
         /// </summary>
         public void Quit()
         {
-            if (!Undo.CanUndo())
+            if (Undo.GetIndex() == cachedUndoIndex_)
             {
                 StopEditor();
                 return;
@@ -1100,7 +1321,7 @@ namespace Wugou.Editor
                 }
                 else
                 {
-                    if (Save(Gameplay.loadedGameMapFile))
+                    if (Save())
                     {
                         StopEditor();
                     }
@@ -1115,82 +1336,51 @@ namespace Wugou.Editor
 
         private void EnableOutline()
         {
-            if (!editorCamera.GetComponent<cakeslice.OutlineEffect>())
-            {
-                var comp = editorCamera.gameObject.AddComponent<cakeslice.OutlineEffect>();
-                comp.lineThickness = 1;
-                comp.lineIntensity = 1.51f;
-                comp.fillAmount = 0.1f;
-                ColorUtility.TryParseHtmlString("#FFC300", out comp.lineColor0);
-                ColorUtility.TryParseHtmlString("#BC5BB9", out comp.lineColor1);
-                ColorUtility.TryParseHtmlString("#0096FF", out comp.lineColor2);
-            }
+            OutlineEffect.Apply(editorCamera);
         }
 
         private void SetOutlineEnabled(GameObject go, bool enable)
         {
             if (enable)
             {
-                foreach (var v in go.GetComponentsInChildren<Renderer>())
-                {
-                    var outlineComp = v.GetComponent<cakeslice.Outline>();
-                    if (outlineComp)
-                    {
-                        outlineComp.enabled = true;
-                    }
-                    else
-                    {
-                        if (!v.GetComponent<IgnoreOutline>())
-                        {
-                            outlineComp = v.gameObject.AddComponent<cakeslice.Outline>();
-                            outlineComp.color = 0;
-                        }
-
-                    }
-                }
+                OutlineEffect.AddOrEnableOutline(go);
             }
             else
             {
-                if (go)
-                {
-                    foreach (var v in go.GetComponentsInChildren<cakeslice.Outline>())
-                    {
-                        v.enabled = false;
-                    }
-                }
+                OutlineEffect.DisableOutline(go);
             }
         }
 
-        private int cameraLockBit_ = 0;
-        /// <summary>
-        /// 有多种情况需要锁住相机，用位来记录多种情况
-        /// </summary>
-        /// <param name="bit"></param>
-        private void LockEditorCamera(int bit)
-        {
-            cameraLockBit_ |= 1 << bit;
-            if (flyCamera_)
-            {
-                flyCamera_.enabled = (cameraLockBit_ == 0);
-            }
+        //private int cameraLockBit_ = 0;
+        ///// <summary>
+        ///// 有多种情况需要锁住相机，用位来记录多种情况
+        ///// </summary>
+        ///// <param name="bit"></param>
+        //private void LockEditorCamera(int bit)
+        //{
+        //    cameraLockBit_ |= 1 << bit;
+        //    if (flyCamera_)
+        //    {
+        //        flyCamera_.enabled = (cameraLockBit_ == 0);
+        //    }
 
-        }
+        //}
 
-        private void UnlockEditorCamera(int bit)
-        {
-            cameraLockBit_ &= ~(1 << bit);
-            if (flyCamera_)
-            {
-                flyCamera_.enabled = (cameraLockBit_ == 0);
-            }
-        }
+        //private void UnlockEditorCamera(int bit)
+        //{
+        //    cameraLockBit_ &= ~(1 << bit);
+        //    if (flyCamera_)
+        //    {
+        //        flyCamera_.enabled = (cameraLockBit_ == 0);
+        //    }
+        //}
 
         /// <summary>
         /// 锁住编辑器相机，不让操作
         /// </summary>
         public void LockEditorCamera()
         {
-            LockEditorCamera(1);
+            flyCamera_.enabled = false;
         }
 
         /// <summary>
@@ -1198,8 +1388,19 @@ namespace Wugou.Editor
         /// </summary>
         public void UnlockEditorCamera()
         {
-            UnlockEditorCamera(1);
+            flyCamera_.enabled = true;
         }
+
+        /// <summary>
+        /// 设置是否是正交矩阵
+        /// </summary>
+        /// <param name="enable"></param>
+        public void SetOrtho(bool enable)
+        {
+            editorCamera.orthographic = enable;
+            editorCamera.orthographicSize = 50;
+        }
+
 
         private bool isPreviewMode_ = false;
         public void SwitchPreviewMode(bool preview)

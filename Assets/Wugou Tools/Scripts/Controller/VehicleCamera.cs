@@ -22,14 +22,22 @@ namespace Wugou
 
         public enum UpdateType // The available methods of updating are:
         {
+            Update, // Update in Update.
             FixedUpdate, // Update in FixedUpdate (for tracking rigidbodies).
             LateUpdate, // Update in LateUpdate. (for tracking objects that are moved in Update)
             ManualUpdate, // user must call to update camera
         }
 
+        public enum SmoothType
+        {
+            Fast,   // perform location immediate
+            Smooth
+        }
+
         [SerializeField] protected Transform m_Target;            // The target object to follow
         [SerializeField] private bool m_AutoTargetPlayer = true;  // Whether the rig should automatically target the player.
         [SerializeField] private UpdateType m_UpdateType;         // stores the selected update type
+        [SerializeField] private SmoothType m_SmoothType;         // stores the selected update type
 
         protected Rigidbody targetRigidbody;
 
@@ -56,6 +64,20 @@ namespace Wugou
             }
             if (m_Target == null) return;
             targetRigidbody = m_Target.GetComponent<Rigidbody>();
+        }
+
+        private void Update()
+        {
+            // we update from here if updatetype is set to Fixed, or in auto mode,
+            // if the target has a rigidbody, and isn't kinematic.
+            if (m_AutoTargetPlayer && (m_Target == null || !m_Target.gameObject.activeSelf))
+            {
+                FindAndTargetPlayer();
+            }
+            if (m_UpdateType == UpdateType.Update)
+            {
+                FollowTarget(Time.deltaTime);
+            }
         }
 
 
@@ -186,7 +208,14 @@ namespace Wugou
             }
 
             // camera position moves towards target position:
-            transform.position = Vector3.Lerp(transform.position, m_Target.position, deltaTime * m_MoveSpeed);
+            if (m_SmoothType == SmoothType.Smooth)
+            {
+                transform.position = Vector3.Lerp(transform.position, m_Target.position, deltaTime * m_MoveSpeed);
+            }
+            else
+            {
+                transform.position = m_Target.position;
+            }
 
             // camera's rotation is split into two parts, which can have independend speed settings:
             // rotating towards the target's forward direction (which encompasses its 'yaw' and 'pitch')

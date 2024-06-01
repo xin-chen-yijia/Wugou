@@ -55,12 +55,16 @@ namespace Wugou.Editor.UI
 
                     foreach (var comp in target.GetComponentsInChildren<MonoBehaviour>())
                     {
-                        var view = PropertyViewManager.instance.GetViewOfComponent(comp.GetType());
-                        if (view)
+                        if (comp)   // ÓÐscript missingµÄÊ±ºò
                         {
-                            view.target = obj;
-                            view.Show();
+                            var view = PropertyViewManager.instance.GetViewOfComponent(comp.GetType());
+                            if (view)
+                            {
+                                view.target = obj;
+                                view.Show();
+                            }
                         }
+
                     }
                 }
             }

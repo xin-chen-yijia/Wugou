@@ -16,8 +16,9 @@ namespace Wugou
     {
         public static JsonConverter[] commonConverts = new JsonConverter[] { new GameEntityConverter(), new Vector3Converter(), new QuaternionConverter() };
         //public static JsonConverterCollection commonConverts = new JsonConverterCollection() { new GameEntityConverter(), new Vector3Converter(), new QuaternionConverter()};
+        public static JsonSerializerSettings commonSerializerSettings = new JsonSerializerSettings() { Converters = JsonSerializerGlobal.commonConverts, ContractResolver= new LimitRefContractResolver(),NullValueHandling = NullValueHandling.Ignore };
 
-        public static JsonSerializer commonSerializer = JsonSerializer.Create(new JsonSerializerSettings() { Converters = JsonSerializerGlobal.commonConverts, ContractResolver= new LimitRefContractResolver(),NullValueHandling = NullValueHandling.Ignore });
+        public static JsonSerializer commonSerializer = JsonSerializer.Create(commonSerializerSettings);
 
         public static HashSet<Type> limitTypes { get; } = new HashSet<Type>() {
             typeof(GameObject),
@@ -38,9 +39,18 @@ namespace Wugou
         public override GameEntity ReadJson(JsonReader reader, Type objectType, GameEntity existingValue, bool hasExistingValue, JsonSerializer serializer)
         {
             JToken jo = JObject.ReadFrom(reader);
-            string asset = jo[nameof(GameEntity)]["asset"].ToString();
-            string prototype = jo[nameof(GameEntity)]["prototype"].ToString();
-            GameEntity entity = GameEntityManager.CreateGameEntity(asset, prototype);
+            string asset = jo[nameof(GameEntity)]["asset"]?.ToString();
+            string prototype = jo[nameof(GameEntity)]["prototype"]?.ToString();
+            ;
+            GameEntity entity;
+            if (jo[nameof(GameEntity)][nameof(GameEntity.isFromTheBeginning)] != null && jo[nameof(GameEntity)][nameof(GameEntity.isFromTheBeginning)].ToObject<bool>())
+            {
+                entity = GameWorld.GetGameEntityExistFromTheBeginning(jo[nameof(GameEntity)][nameof(GameEntity.id)].ToObject<int>());
+            }
+            else
+            {
+                entity = GameEntityManager.CreateGameEntity(asset, prototype);
+            }
 
             foreach (var comp in entity.GetComponents<MonoBehaviour>())
             {
@@ -71,6 +81,14 @@ namespace Wugou
                 if (jo[compType.Name] != null)
                 {
                     PopulateObject(jo[compType.Name].ToString(), comp, serializer);
+
+                    // 如果Rigidbody使用插值模式，会改变序列化时设置的transform信息
+                    var rigidbody = entity.GetComponent<Rigidbody>();  
+                    if (rigidbody && rigidbody.interpolation != RigidbodyInterpolation.None)
+                    {
+                        rigidbody.position = entity.transform.position;
+                        rigidbody.rotation = entity.transform.rotation;
+                    }
                 }
 
             }
@@ -120,7 +138,11 @@ namespace Wugou
                 {
                     if(property.GetCustomAttribute<SerializeField>() != null)
                     {
-                        comJo.Add(property.Name, JToken.FromObject(property.GetValue(comp), serializer));
+                        var val = property.GetValue(comp);
+                        if(val != null)
+                        {
+                            comJo.Add(property.Name, JToken.FromObject(val, serializer));
+                        }
                     }
                 }
 

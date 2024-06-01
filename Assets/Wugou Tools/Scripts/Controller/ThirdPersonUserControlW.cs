@@ -1,12 +1,12 @@
 using System;
 using UnityEngine;
 
-#if CROSS_PLATFORM_INPUT
-using EInput = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager;
-#else
+//#if CROSS_PLATFORM_INPUT
+//using EInput = UnityStandardAssets.CrossPlatformInput.CrossPlatformInputManager;
+//#else
+//using EInput = UnityEngine.Input;
+//#endif
 using EInput = UnityEngine.Input;
-#endif
-
 
 namespace Wugou
 {
@@ -22,17 +22,17 @@ namespace Wugou
         
         private void Start()
         {
-            //// get the transform of the main camera
-            //if (Camera.main != null)
-            //{
-            //    lookCamera = Camera.main.transform;
-            //}
-            //else
-            //{
-            //    Debug.LogWarning(
-            //        "Warning: no main camera found. Third person character needs a Camera tagged \"MainCamera\", for camera-relative controls.", gameObject);
-            //    // we use self-relative controls in this case, which probably isn't what the user wants, but hey, we warned them!
-            //}
+            // get the transform of the main camera
+            if (!lookCamera && Camera.main != null)
+            {
+                lookCamera = Camera.main.transform;
+            }
+            else
+            {
+                Debug.LogWarning(
+                    "Warning: no main camera found. Third person character needs a Camera tagged \"MainCamera\", for camera-relative controls.", gameObject);
+                // we use self-relative controls in this case, which probably isn't what the user wants, but hey, we warned them!
+            }
 
             // get the third person character ( this should never be null due to require component )
             m_Character = GetComponent<ThirdPersonCharacterW>();

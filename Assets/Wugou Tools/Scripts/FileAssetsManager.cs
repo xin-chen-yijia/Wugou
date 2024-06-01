@@ -27,7 +27,14 @@ namespace Wugou
                 return;
             }
 
-            File.WriteAllText(path, JsonConvert.SerializeObject(obj));
+            try
+            {
+                File.WriteAllText(path, JsonConvert.SerializeObject(obj));
+            }
+            catch(System.Exception e)
+            {
+                Logger.Error($"Write {path} fail.. {e.Message}");
+            }
         }
     }
 
@@ -70,6 +77,15 @@ namespace Wugou
             return $"{path}/{name}{ext}";
         }
 
+        public string GetRelativePath(string filePath)
+        {
+            var tmp = Path.GetRelativePath(path, filePath);
+            tmp = tmp.Replace("\\", "/");
+            tmp = tmp.Substring(0, tmp.LastIndexOf('.'));
+
+            return tmp;
+        }
+
         public List<string> GetAllNames()
         {
             List<string> list = new List<string>();
@@ -79,10 +95,7 @@ namespace Wugou
             {
                 foreach (FileInfo NextFile in TheFolder.GetFiles($"*{ext}",SearchOption.AllDirectories))
                 {
-                    var tmp = Path.GetRelativePath(path, NextFile.FullName);
-                    tmp = tmp.Replace("\\", "/");
-                    tmp = tmp.Substring(0, tmp.LastIndexOf('.'));
-                    list.Add(tmp);
+                    list.Add(GetRelativePath(NextFile.FullName));
                 }
             }
 
@@ -99,7 +112,10 @@ namespace Wugou
             {
                 foreach (FileInfo NextFile in TheFolder.GetFiles($"*{ext}", SearchOption.AllDirectories))
                 {
-                    list.Add(parser_.Parse(NextFile.FullName));
+                    //var tmp = parser_.Parse(GetRelativePath(NextFile.FullName));
+                    //list.Add(tmp);
+
+                    list.Add(Get(GetRelativePath(NextFile.FullName)));
                 }
             }
 
@@ -116,7 +132,7 @@ namespace Wugou
             parser_.Save($"{path}/{name}{ext}", item, overwrite);
         }
 
-        public void Remove(string name)
+        public void Delete(string name)
         {
             string fullPath = $"{path}/{name}{ext}";
             if (File.Exists(fullPath))

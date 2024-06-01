@@ -77,9 +77,6 @@ namespace Wugou.Editor
 
         public void Build()
         {
-            // 先保存
-            Save();
-
             // 创建文件夹，GameMap相关资产都放入这个文件夹
             var mapPath = $"{Gameplay.gameMapsPath}/{name}";
             Directory.CreateDirectory(mapPath);
@@ -136,6 +133,23 @@ namespace Wugou.Editor
 
             var data = texture.EncodeToJPG();
             File.WriteAllBytes(thumbnailPath, data );
+        }
+    }
+
+    /// <summary>
+    /// 解析GameMapProj
+    /// </summary>
+    public class GameMapProjAssetParser : IAssetParser<GameMapProj>
+    {
+        public GameMapProj Parse(string path)
+        {
+            var proj = new GameMapProj(path);
+            return proj;
+        }
+
+        public void Save(string path, GameMapProj mapProj, bool overwrite = true)
+        {
+            mapProj.Save();
         }
     }
 }

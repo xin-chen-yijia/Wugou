@@ -3,29 +3,15 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Mirror;
-using Wugou.UI;
 
 namespace Wugou.Multiplayer
 {
-    /// <summary>
-    /// 角色可选择
-    /// </summary>
-    public interface IMultiplayerChoosen
-    {
-        public void OnPlayerChosen(MultiplayerGamePlayer player, GameObject hitObj);
-    }
-
     /// <summary>
     /// 用于多人情况下的GameComponent
     /// </summary>
     public class MultiplayerGameComponent : NetworkBehaviour
     {
-
-
-        public virtual void Awake()
-        {
-
-        }
+        public virtual void Awake() { }
 
         /// <summary>
         /// 不是太推荐使用，只是为了少写点代码
@@ -40,15 +26,25 @@ namespace Wugou.Multiplayer
         /// <param name="val"></param>
         public void CallOnAllClient<T>(string methodName, T val)
         {
-            CmdCall(methodName, typeof(T).FullName, Newtonsoft.Json.JsonConvert.SerializeObject(val, JsonSerializerGlobal.commonConverts));
+            CmdCall(methodName, typeof(T).AssemblyQualifiedName, Newtonsoft.Json.JsonConvert.SerializeObject(val, JsonSerializerGlobal.commonConverts));
         }
 
+        public void CallOnAllClientNonAuthority<T>(string methodName, T val)
+        {
+            CmdCallNonAuthority(methodName, typeof(T).AssemblyQualifiedName, Newtonsoft.Json.JsonConvert.SerializeObject(val, JsonSerializerGlobal.commonConverts));
+        }
+
+        /// <summary>
+        /// 底层使用的SendMessage
+        /// </summary>
+        /// <param name="methodName"></param>
         public void CallOnAllClient(string methodName)
         {
             CmdCall(methodName);
         }
 
         #region Mirror RPC
+
         [Command]
         private void CmdCall(string methodName)
         {
@@ -63,6 +59,12 @@ namespace Wugou.Multiplayer
 
         [Command]
         private void CmdCall(string methodName, string valType, string val)
+        {
+            RpcCall(methodName, valType, val);
+        }
+
+        [Command(requiresAuthority = false)]
+        private void CmdCallNonAuthority(string methodName, string valType, string val)
         {
             RpcCall(methodName, valType, val);
         }

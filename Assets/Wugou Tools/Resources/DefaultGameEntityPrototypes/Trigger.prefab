@@ -45,7 +45,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ab020326acccd5d4bb4e41555f89ee77, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  id: 0
+  id: -1122554826
   onLoadBody:
     m_PersistentCalls:
       m_Calls: []

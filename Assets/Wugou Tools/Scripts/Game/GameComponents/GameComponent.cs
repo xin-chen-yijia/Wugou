@@ -12,11 +12,6 @@ namespace Wugou
     /// </summary>
     public class GameComponent : MonoBehaviour
     {
-
-        public virtual void OnPlayerChosen(GamePlayer player, GameObject hitObj)
-        {
-
-        }
     }
 
 }

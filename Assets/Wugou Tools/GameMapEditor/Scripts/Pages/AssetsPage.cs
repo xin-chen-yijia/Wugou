@@ -135,13 +135,13 @@ namespace Wugou.Editor.UI
 
             task.AddTask(async () =>
             {
-                var tex = await GameAssetDatabase.GetAssetAsync<Sprite>(assetItem.icon);
+                var tex = await GameAssetDatabase.GetAssetAsync<Texture2D>(assetItem.icon);
                 if (tex != null && task.isRunning)
                 {
                     // go 可能在加载过程中被删除了
                     if (go)
                     {
-                        go.transform.Find("Icon").GetComponent<Image>().sprite = tex;
+                        go.transform.Find("Icon").GetComponent<Image>().sprite = Utils.CreateSprite(tex);
                     }
                 }
 

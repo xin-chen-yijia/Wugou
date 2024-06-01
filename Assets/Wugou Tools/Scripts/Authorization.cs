@@ -119,6 +119,15 @@ namespace Wugou
             activeUser = JsonConvert.DeserializeObject<User>(authInfo);
             return true;
         }
+
+        public static void SetMockUser(string name)
+        {
+            if(activeUser == null)
+            {
+                activeUser = new User();
+            }
+            activeUser.name = name;
+        }
     }
 }
 

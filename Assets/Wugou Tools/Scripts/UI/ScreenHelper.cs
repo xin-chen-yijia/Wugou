@@ -4,6 +4,7 @@ using UnityEngine;
 using System.Runtime.InteropServices;
 using System;
 using System.Linq;
+using System.Text;
 
 namespace Wugou
 {
@@ -31,7 +32,11 @@ namespace Wugou
         /// ......
         /// </summary>
         public const long WS_BORDER = 0x00800000L;
+        public const long WS_POPUP = 0x80000000L;
         public const long WS_DLGFRAME = 0x00400000L;
+        public const long WS_MINIMIZEBOX = 0x00020000L;
+        public const long WS_MAXIMIZEBOX = 0x00010000L;
+        public const long WS_THICKFRAME = 0x00040000L;
         public const long WS_CHILD = 0x40000000L;
         public const long WS_CAPTION = 0x00C00000L;
         //public const long WS_CAPTION = WS_BORDER | WS_DLGFRAME;
@@ -45,14 +50,39 @@ namespace Wugou
         const int GWL_EXSTYLE = -20;
 
         [DllImport("user32.dll")]
-        static extern IntPtr GetForegroundWindow();
+        public static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr SetForegroundWindow(IntPtr hwd);
 
         [DllImport("user32.dll")]
         public static extern long GetWindowLong(IntPtr hwd, int nIndex);
 
+        [DllImport("user32.dll")]
+        public static extern IntPtr FindWindow(string className, string windowName);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetActiveWindow();
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr SetActiveWindow(IntPtr hwd);
 
         [DllImport("user32.dll")]
         static extern IntPtr SetWindowLong(IntPtr hwnd, int _nIndex, long dwNewLong);
+
+        private const string UnityWindowClassName = "UnityWndClass";
+
+        [DllImport("kernel32.dll")]
+        static extern uint GetCurrentThreadId();
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        static extern int GetClassName(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+        public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool EnumThreadWindows(uint dwThreadId, EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
 
         private static IntPtr _wndHandle = IntPtr.Zero;
         private static IntPtr wndHandle
@@ -61,7 +91,19 @@ namespace Wugou
             {
                 if (_wndHandle == IntPtr.Zero)
                 {
-                    _wndHandle = GetForegroundWindow();
+                    //_wndHandle = GetForegroundWindow();
+                    uint threadId = GetCurrentThreadId();
+                    EnumThreadWindows(threadId, (hWnd, lParam) =>
+                    {
+                        var classText = new StringBuilder(UnityWindowClassName.Length + 1);
+                        GetClassName(hWnd, classText, classText.Capacity);
+                        if (classText.ToString() == UnityWindowClassName)
+                        {
+                            _wndHandle = hWnd;
+                            return false;
+                        }
+                        return true;
+                    }, IntPtr.Zero);
                 }
                 return _wndHandle;
             }
@@ -74,6 +116,12 @@ namespace Wugou
         public static void SetTitleBarHide(bool isHide)
         {
 #if !UNITY_EDITOR
+            if (wndHandle == IntPtr.Zero)
+            {
+                Logger.Error("get window handle fail...");
+                return;
+            }
+
             // Òþ²Ø±êÌâÀ¸
             var windowStyle = GetWindowLong(wndHandle, GWL_STYLE);
             if (isHide)
@@ -84,7 +132,9 @@ namespace Wugou
             {
                 windowStyle |= (WS_CAPTION | WS_SIZEBOX);
             }
+
             SetWindowLong(wndHandle, GWL_STYLE, windowStyle);
+            //SetForegroundWindow(wndHandle);
 #endif
         }
 #else

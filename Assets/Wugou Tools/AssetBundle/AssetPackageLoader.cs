@@ -27,6 +27,7 @@ namespace Wugou
     public class AssetBundleDescFile
     {
         public string unityVersion = string.Empty;
+        public string wugouVersion = string.Empty;
         public string createTime = string.Empty;
         public List<AssetBundleContent> contents = new List<AssetBundleContent>();
     }
@@ -170,6 +171,12 @@ namespace Wugou
                 }
 
                 Logger.DebugInfo($"{rootPath} build with:{assetbundleLauchDesc.unityVersion}");
+                Logger.DebugInfo($"{rootPath}' version: {assetbundleLauchDesc.wugouVersion}");
+                if(assetbundleLauchDesc.wugouVersion != PackageInformation.latestVersion)
+                {
+                    Logger.Warning($"{rootPath}' build with: {assetbundleLauchDesc.wugouVersion}, May not be compatible with {PackageInformation.latestVersion}...");
+                }
+
                 return AssetBundleAssetLoadResult.kSuccess;
             }
         }
@@ -226,6 +233,13 @@ namespace Wugou
             return aop.assetBundle;
         }
 
+        /// <summary>
+        /// 缓存正在加载的assetbundle，因为Unity不让加载同一个ab包两次
+        /// </summary>
+        Dictionary<string, Task<AssetBundle>> loadingRequests = new Dictionary<string, Task<AssetBundle>>();
+
+        private Task<AssetBundle> manifestAbTask_ = null;
+
         public override async Task<AssetBundle> LoadAssetBundleAsync(string path)
         {
             if (loadedAssetbundles_.ContainsKey(path))
@@ -235,11 +249,19 @@ namespace Wugou
 
             if (!mainManifest_)
             {
-                string baseAbName = Path.GetFileName(rootPath);
-                string manifestBundlePath = $"{rootPath}/{baseAbName}";
-                AssetBundle manifestBundle = await LoadAssetBundleAsyncInternal(manifestBundlePath);
-                mainManifest_ = manifestBundle.LoadAsset<AssetBundleManifest>("AssetBundleManifest");
-                manifestBundle.Unload(false);
+                if (manifestAbTask_ == null)
+                {
+                    string baseAbName = Path.GetFileName(rootPath);
+                    string manifestBundlePath = $"{rootPath}/{baseAbName}";
+                    manifestAbTask_ = LoadAssetBundleAsyncInternal(manifestBundlePath);
+                }
+
+                AssetBundle manifestBundle = await manifestAbTask_;
+                if (!mainManifest_)
+                {
+                    mainManifest_ = manifestBundle.LoadAsset<AssetBundleManifest>("AssetBundleManifest");
+                    manifestBundle.Unload(false);
+                }
             }
 
             string[] dps = mainManifest_.GetAllDependencies(path);
@@ -248,7 +270,16 @@ namespace Wugou
                 await LoadAssetBundleAsync(v);
             }
 
-            var ab = await LoadAssetBundleAsyncInternal($"{rootPath}/{path}");
+            if (loadingRequests.ContainsKey(path))
+            {
+                return await loadingRequests[path];
+            }
+
+            var task = LoadAssetBundleAsyncInternal($"{rootPath}/{path}");
+            loadingRequests.Add(path, task);
+            var ab = await task;
+            loadingRequests.Remove(path);
+
             loadedAssetbundles_.Add(path, ab);    // 加载完成
 
             return ab;
@@ -555,7 +586,7 @@ namespace Wugou
             {
                 foreach (var name in v.assets)
                 {
-                    if (name.Contains(assetName))
+                    if (name.EndsWith($"/{assetName}") || name == assetName)
                     {
                         return v.assetbundleName;
                     }
@@ -613,7 +644,7 @@ namespace Wugou
             var bundle = await LoadAssetBundleAsync(bundleName);
             if (!bundle || !bundle.Contains(assetName))
             {
-                Logger.Error($"Assetbundle '{assetbundleDir}' not contain's {assetName}");
+                Logger.Error($"Assetbundle '{assetbundleDir}' not contain's {assetName}. find assetbundle:{bundleName}");
                 return null;
             }
             var loadOp = bundle.LoadAssetAsync<T>(assetName);

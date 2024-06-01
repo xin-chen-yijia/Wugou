@@ -98,7 +98,7 @@ namespace Wugou
             this.startTangent = startTangent;
             this.endTangent = endTangent;
 
-            // 计算管道的大小， 但为什么跟长度相关？
+            // 计算管道弯曲部分的小长短
             float scale = cornerScale;
             float length = (start - end).magnitude / 4;
             if (scale > length)

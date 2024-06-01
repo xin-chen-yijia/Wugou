@@ -1,10 +1,11 @@
-using Newtonsoft.Json;
 using System;
+using System.IO;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Networking;
+using Newtonsoft.Json;
 
 
 namespace Wugou
@@ -115,65 +116,24 @@ namespace Wugou
             this.path = path;
         }
 
-        private static Dictionary<string, Texture2D> cachedTextures_ = new Dictionary<string, Texture2D>();
-        private static Dictionary<string, Task<Texture2D>> cachedLoadingTextures_ = new Dictionary<string,Task<Texture2D>>();
-
         internal static async Task<Texture2D> LoadTextureAsync(string path)
         {
-            if (cachedTextures_.ContainsKey(path) && cachedTextures_[path])
-            {
-                return cachedTextures_[path];
-            }
-
-            if (cachedLoadingTextures_.ContainsKey(path))
-            {
-                return await cachedLoadingTextures_[path];
-            }
-
-            var task = Utils.LoadTextureAsync($"{path}");
-            cachedLoadingTextures_[path] = task;
-
-            var tex = await task;
-            cachedTextures_[path] = tex;
-            cachedLoadingTextures_.Remove(path);
-
-            return tex;
-        }
-
-        private static Dictionary<string, Sprite> cachedSprites_ = new Dictionary<string, Sprite>();
-
-        internal static async Task<Sprite> LoadSpriteAsync(string path)
-        {
-            if (cachedSprites_.ContainsKey(path) && cachedSprites_[path])
-            {
-                return cachedSprites_[path];
-            }
-
-            var tex = await LoadTextureAsync($"{path}");
-            if (!tex)
-            {
-                return null;
-            }
-
-            var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
-            cachedSprites_[path] = sprite;
-            return sprite;
-
+            return await Utils.LoadTextureAsync($"{path}");
         }
 
         public override async Task<T> GetAsset<T>(string path)
         {
-            path = $"{this.path}/{path}";
-            if(path.EndsWith(".png") || path.EndsWith(".jpg"))
+            if(path.EndsWith(".png") || path.EndsWith(".jpg") || path.EndsWith(".jpeg"))
             {
-                if(typeof(T) == typeof(Sprite))
-                {
-                    return (await LoadSpriteAsync(path)) as T;
-                }
-                else if(typeof(T) == typeof(Texture2D))
+                path = $"{this.path}/{path}";
+                if(typeof(T) == typeof(Texture2D))
                 {
                     return (await LoadTextureAsync(path)) as T;
                 }
+            }
+            else
+            {
+                Wugou.Logger.Error($"Not Support {typeof(T).FullName} in LocalFileSystem..");
             }
 
             return null;
@@ -185,21 +145,135 @@ namespace Wugou
     /// </summary>
     public class WebFileSystem : LiteFileSystemBase
     {
-        public override async Task<T> GetAsset<T>(string path)
+        private string cachedPath_ => $"{Application.persistentDataPath}/.webcache";
+        private string cachedListFie_ => $"{cachedPath_}/.cache";
+
+        private class WebFileDesc
         {
-            if (path.EndsWith(".png") || path.EndsWith(".jpg"))
+            public string uri;
+            public string file;
+            public string modifiedTime;
+            public string expiredTime;
+        }
+
+        Dictionary<string,WebFileDesc> filelist_ = new Dictionary<string, WebFileDesc>();
+        public WebFileSystem()
+        {
+            Directory.CreateDirectory(cachedPath_);
+
+            // 检查缓存
+            if (File.Exists(cachedListFie_))
             {
-                if (typeof(T) == typeof(Sprite))
+                var files = JsonConvert.DeserializeObject<List<WebFileDesc>>(File.ReadAllText(cachedListFie_, System.Text.Encoding.UTF8));
+
+                var remainList = new List<WebFileDesc>();
+                for(int i=0;i<files.Count; i++)
                 {
-                    return (await LocalFileSystem.LoadSpriteAsync(path)) as T;
+                    var t = DateTime.Parse(files[i].expiredTime);
+                    if (DateTime.Compare(t, DateTime.Now) < 0)
+                    {
+                        File.Delete($"{cachedPath_}/{files[i].file}");
+                    }
+                    else
+                    {
+                        remainList.Add(files[i]);
+                    }
                 }
-                else if (typeof(T) == typeof(Texture2D))
+
+                for(int i = 0; i < remainList.Count; i++)
                 {
-                    return (await LocalFileSystem.LoadTextureAsync(path)) as T;
+                    filelist_.Add(remainList[i].uri, remainList[i]);
                 }
             }
+        }
 
+        public async Task<T> GetAssetInternal<T>(string path) where T : UnityEngine.Object
+        {
+            T asset = null;
+            if (typeof(T) == typeof(Texture2D))
+            {
+                asset = (await LocalFileSystem.LoadTextureAsync(path)) as T;
+            }
+            else
+            {
+                Wugou.Logger.Error($"load {path} with wrong type....");
+            }
+
+            return asset;
+        }
+
+        public override async Task<T> GetAsset<T>(string path)
+        {
+            bool isPng = path.EndsWith(".png");
+            bool isJpg = path.EndsWith(".jpg") || path.EndsWith("jpeg");
+            if (isPng || isJpg)
+            {
+                var fileName = Path.GetFileName(path);
+                WebFileDesc webFileDesc = null;
+
+                // 先看有沒有緩存，緩存包括记录和实体文件
+                bool hasCache = filelist_.ContainsKey(path) && File.Exists($"{cachedPath_}/{filelist_[path].file}");
+
+                // 获取服务器文件信息，看是否需要更新
+                using (var request = UnityWebRequest.Head(path))
+                {
+                    await request.SendWebRequest();
+                    if (request.result == UnityWebRequest.Result.Success)
+                    {
+                        var modifiedStr = request.GetResponseHeader("last-modified");
+                        var modifiedTime = DateTime.Parse(modifiedStr);
+                        if (hasCache)
+                        {
+                            var oldModifiedTime = DateTime.Parse(filelist_[path].modifiedTime);
+                            if (DateTime.Compare(modifiedTime, oldModifiedTime) <= 0)   // 不需要更新，读取缓存
+                            {
+                                // 获取缓存图片
+                                var tt = await GetAssetInternal<T>($"{cachedPath_}/{filelist_[path].file}");
+                                return (tt);
+                            }
+                        }
+
+
+                        // 否则更新记录
+                        webFileDesc = new WebFileDesc()
+                        {
+                            uri = request.url,
+                            file = fileName,
+                            modifiedTime = request.GetResponseHeader("last-modified"),
+                            expiredTime = DateTime.Now.AddDays(2).ToString()
+                        };
+
+                    }
+                }
+
+                // 获取web图片
+                T asset = await GetAssetInternal<T>(path);
+
+                // 存储
+                if (asset)
+                {
+                    Texture2D tex = asset as Texture2D;
+                    if (tex)
+                    {
+                        var data = isJpg ? tex.EncodeToJPG() : tex.EncodeToPNG();
+                        File.WriteAllBytes($"{cachedPath_}/{fileName}", data);
+                    }
+                }
+                if (webFileDesc != null)
+                {
+                    filelist_[webFileDesc.uri] = webFileDesc;
+                }
+
+                return asset;
+            }
+
+            Wugou.Logger.Error($"Not support {path}");
             return null;
+        }
+
+        public override void Unload()
+        {
+            File.WriteAllText(cachedListFie_, JsonConvert.SerializeObject(new List<WebFileDesc>(filelist_.Values)), System.Text.Encoding.UTF8);
         }
     }
 
@@ -238,24 +312,36 @@ namespace Wugou
     {
         public const string kWebMountPoint = "/web";
         public const string kBuiltInMountPoint = "/BuiltIn";
+        public const string kResourcesMountPoint = "/Resources";
 
         private static Dictionary<string, LiteFileSystemBase> mountedFileSystems_ = new Dictionary<string, LiteFileSystemBase>()
         {
             {kWebMountPoint, new WebFileSystem() },
-            {kBuiltInMountPoint, new ResourceFileSystem() },
+            {kResourcesMountPoint, new ResourceFileSystem() },
         };
 
         /// <summary>
         /// 挂载一个Assetbundle
         /// </summary>
+        /// <param name="mountPoint"></param>
         /// <param name="path"></param>
-        public static async Task<bool> MountAssetBundle(string mountPoint, string path)
+        /// <param name="overwrite"></param>
+        public static async Task<bool> MountAssetBundle(string mountPoint, string path, bool overwrite = false)
         {
-            var abFS = new AssetBundleFileSystem(path);
-            mountedFileSystems_[mountPoint] = abFS;
+            if(!overwrite && mountedFileSystems_.ContainsKey(mountPoint))
+            {
+                return true;
+            }
 
-            return await abFS.Load();
-           
+            var abFS = new AssetBundleFileSystem(path);
+            var ret = await abFS.Load();
+
+            if (ret)
+            {
+                mountedFileSystems_[mountPoint] = abFS;
+            }
+
+            return ret;
         }
 
         public static void MountDirectory(string mountPoint, string path)
@@ -275,6 +361,25 @@ namespace Wugou
 
                 mountedFileSystems_.Remove(mountPoint);
             }
+        }
+
+        public static void UnmountAll()
+        {
+            foreach(var v in mountedFileSystems_)
+            {
+                v.Value.Unload();
+            }
+            mountedFileSystems_.Clear();
+        }
+
+        /// <summary>
+        /// 判断是否是可加载的AB包
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public static bool IsAssetbundle(string path)
+        {
+            return File.Exists($"{path}/{Path.GetFileName(path)}{AssetPackageLoader.kDescFileNameSuffix}");
         }
 
         /// <summary>
@@ -305,6 +410,11 @@ namespace Wugou
             return new PathInfo() { root = path.Substring(0, pos), name = path.Substring(pos + 1) };
         }
 
+        // 缓存
+        private static Dictionary<string, UnityEngine.Object> cachedAssets_ = new Dictionary<string, UnityEngine.Object>();
+        // 正在加载的缓存
+        private static Dictionary<string, Task> cachedLoadingAssets_ = new Dictionary<string, Task>();
+
         /// <summary>
         /// 获取游戏资产
         /// </summary>
@@ -319,6 +429,19 @@ namespace Wugou
                 return null;
             }
 
+            if (cachedAssets_.ContainsKey(assetPath))
+            {
+                return cachedAssets_[assetPath] as T;
+            }
+
+            // 正在加载中的
+            if (cachedLoadingAssets_.ContainsKey(assetPath))
+            {
+                var task = cachedLoadingAssets_[assetPath] as Task<T>;
+                return await task;
+            }
+
+
             if (assetPath.StartsWith("http",StringComparison.OrdinalIgnoreCase))
             {
                 return await mountedFileSystems_[kWebMountPoint].GetAsset<T>(assetPath);
@@ -328,7 +451,13 @@ namespace Wugou
             var fs = GetFileSystem(pathInfo.root);
             if (fs != null)
             {
-                return await fs.GetAsset<T>(pathInfo.name);
+                var task = fs.GetAsset<T>(pathInfo.name);
+                cachedLoadingAssets_.Add(assetPath, task);
+                var asset = await task;
+                cachedAssets_.Add(assetPath, asset);
+                cachedLoadingAssets_.Remove(assetPath);
+
+                return asset;
             }
 
             return null;

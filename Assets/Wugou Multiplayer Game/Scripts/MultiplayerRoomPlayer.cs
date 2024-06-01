@@ -2,9 +2,7 @@ using Wugou;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using Wugou.Editor;
 using Mirror;
-using Wugou.Multiplayer;
 
 namespace Wugou.Multiplayer {
 
@@ -30,6 +28,12 @@ namespace Wugou.Multiplayer {
         /// </summary>
         [SyncVar(hook = nameof(RoomSeatChanged))]
         public int roomSeat = -1;
+
+        /// <summary>
+        /// 地图是否准备好
+        /// </summary>
+        [SyncVar]
+        public bool isGameMapReady;
 
         #region sync hooks
 
@@ -104,6 +108,12 @@ namespace Wugou.Multiplayer {
             this.roomSeat = roomSeat;
         }
 
+        [Command]
+        public void CmdSetIsGameMapReady(bool value)
+        {
+            isGameMapReady = value;
+        }
+
 
         public override void Start()
         {
@@ -111,7 +121,26 @@ namespace Wugou.Multiplayer {
             if (isLocalPlayer)
             {
                 CmdSetPlayerName(Authorization.activeUser?.name ?? "unknown");
+
+                if (!isServer)
+                {
+                    StartCoroutine(CheckGameMapReady());
+                }
+                else
+                {
+                    isGameMapReady = true;
+                }
             }
+        }
+
+        IEnumerator CheckGameMapReady()
+        {
+            while (MultiplayerGameManager.instance.gameMapPackage == null)
+            {
+                yield return null;
+            }
+
+            CmdSetIsGameMapReady(true);
         }
 
         public override void OnDisable()

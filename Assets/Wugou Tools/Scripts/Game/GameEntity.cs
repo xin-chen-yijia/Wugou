@@ -2,9 +2,13 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.Events;
 using Wugou.Editor;
+
+#if UNITY_EDITOR
+using UnityEditor.SceneManagement;
+using UnityEditor;
+#endif
 
 namespace Wugou
 {
@@ -12,15 +16,19 @@ namespace Wugou
     /// 基本的游戏实体，作用类似Unity的GameObject
     /// </summary>
     [System.Serializable]
-    [HasGameComponentView]
     [CustomGameComponentView(typeof(GameEntityCommonView))]
     public class GameEntity : MonoBehaviour
     {
         /// <summary>
         /// id 用于唯一标识（包括网络同步的情况下）
         /// </summary>
-        [SerializeField]
+        [SerializeField]    // 注意，标识出来时为了保存脚本的时候序列化，而非Unity属性面板的显示
         public int id;
+
+        /// <summary>
+        /// 标识是否一开始就在场景中
+        /// </summary>
+        public bool isFromTheBeginning = false;
 
         /// <summary>
         /// 名称，name被GameObject占用了，所以用这个
@@ -29,16 +37,16 @@ namespace Wugou
         public new string name { get { return gameObject.name; } set { gameObject.name = value; } }
 
         /// <summary>
-        /// 资产，用于创建可见模型
+        /// 资产，用于创建可见模型，也就是body
         /// </summary>
         [SerializeField]
-        public string asset;
+        public string asset { get; set; }
 
         /// <summary>
-        /// 原型，当前使用Unity Prefab来表示原型，即一个空的GameObject+Components表示场景中的对象
+        /// 原型名称，使用Prefab来表示原型，GameEntity=prototype(prefab) + asset(body)
         /// </summary>
         [SerializeField]
-        public string prototype;
+        public string prototype { get; set; }
 
         [SerializeField]
         public Vector3 position { get { return transform.position; } set { transform.position = value; } }
@@ -56,24 +64,42 @@ namespace Wugou
 
         public void SetActive(bool value) => gameObject.SetActive(value);
 
-        [SerializeField]
+        //[SerializeField]
         public int layer { get { return gameObject.layer; } set { gameObject.layer = value; } }
 
+        /// <summary>
+        /// 一开始就在场景中的物体当作时静态物体，不可移动
+        /// </summary>
+        public bool isStatic => isFromTheBeginning;
+
+        /// <summary>
+        /// 使用asset创建的模型
+        /// </summary>
         public GameObject body { get; private set; }
 
         public const string kBodyName = "Body";
 
         /// <summary>
+        /// 需要序列化
+        /// 主要是为了处理：随场景来的那些GameEntity如果没有改动，则不需要保存
+        /// TODO: 可对原始的那些GameEntity进行更改
+        /// </summary>
+        public bool needSerialize => !isFromTheBeginning;
+
+        /// <summary>
         /// 实例化模型后调用
         /// </summary>
-        public UnityEvent onLoadBody = new UnityEvent();
+        public UnityEvent onInstantiateBody = new UnityEvent();
 
         private void OnValidate()
         {
-            if (!Utils.IsPrefab(gameObject) && id == 0)
+#if UNITY_EDITOR
+            if (id == 0 && !Utils.IsPrefab(gameObject) && PrefabStageUtility.GetCurrentPrefabStage() == null)
             {
                 id = GameEntityManager.AllocateEntityId();
+                isFromTheBeginning = true;
             }
+#endif
         }
 
         /// <summary>
@@ -93,23 +119,24 @@ namespace Wugou
             }
             else
             {
+                // 因为是异步，这里可能会出现物体被删除的情况（比如超时退出游戏了)，所以再检查一次
+                if (!gameObject)
+                {
+                    Logger.Warning("GameEntity be destroyed when InstantiateBody.. ");
+                    return null;
+                }
                 GameObject go = GameObject.Instantiate<GameObject>(goPfb, transform);
                 go.transform.localPosition = Vector3.zero;
                 go.transform.localRotation = Quaternion.identity;
 
                 // 保持和entity相同tag和layer属性
-                Utils.SetLayerRecursively(go,gameObject.layer);
+                go.layer = gameObject.layer;    // 不递归设置子物体的layer
                 go.tag = gameObject.tag;
                 go.name = kBodyName;
 
-                // send to other component
-                //foreach(var v in GetComponents<GameComponent>())
-                //{
-                //    v.OnLoadBody();
-                //}
-                onLoadBody.Invoke();
-
                 body = go;
+
+                onInstantiateBody.Invoke();
                 return go;
             }
         }
@@ -128,6 +155,15 @@ namespace Wugou
 
             this.asset = asset;
             return await InstantiateBody();
+        }
+
+        /// <summary>
+        /// 设置为一个已有的GameObject为body
+        /// </summary>
+        /// <param name="body"></param>
+        public void SetBody(GameObject body)
+        {
+            this.body = body;
         }
 
         #region Object Compare

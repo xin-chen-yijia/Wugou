@@ -25,7 +25,6 @@ namespace Wugou.Multiplayer
         public int playerRole;
 
         //
-        protected Camera mainCam;
         public float maxSelectDistance = 100;
 
         /// <summary>
@@ -80,7 +79,6 @@ namespace Wugou.Multiplayer
             base.OnStartLocalPlayer();
 
             owner = this;
-            mainCam = Camera.current;
         }
 
         public override void OnStopLocalPlayer()
@@ -88,17 +86,6 @@ namespace Wugou.Multiplayer
             base.OnStopLocalPlayer();
 
             owner = null;
-        }
-
-        /// <summary>
-        /// StartGame
-        ///    Load GameScene
-        ///        Wait others loaded
-        ///             ReadyGo
-        /// 用于客户端处理正式开始游戏的逻辑，客户端加载完场景后调用
-        /// </summary>
-        public virtual void ReadyGo()
-        {
         }
 
         /// <summary>
@@ -131,6 +118,44 @@ namespace Wugou.Multiplayer
             {
                 Wugou.Logger.Error($"Not found GameEntity： {entityID}");
             }
+        }
+
+        /// <summary>
+        /// 客户端预测模式下，设置有刚体的
+        /// </summary>
+        /// <param name="position"></param>
+        /// <param name="rotation"></param>
+        public void SetPositionAndRotationInPredictedRigidbody(Vector3 position,  Quaternion rotation)
+        {
+            var rigidbody = GetComponent<PredictedRigidbody>().predictedRigidbody;
+            rigidbody.position = position;
+            rigidbody.rotation = rotation;
+
+            CmdSetPositionAndRotationInPredictedRigidbody(position,rotation );
+        }
+
+        /// <summary>
+        /// 获取可预测刚体的位置和角度
+        /// </summary>
+        /// <param name="postion"></param>
+        /// <param name="rotation"></param>
+        public void GetPositionAndRotationInPredictedRigidbody(out Vector3 postion, out Quaternion rotation)
+        {
+            var rigidbody = GetComponent<PredictedRigidbody>().predictedRigidbody;
+            postion = rigidbody.position;
+            rotation = rigidbody.rotation;
+        }
+
+        /// <summary>
+        /// 从场景中消失，注意不是移除
+        /// 角色还在场景中，但其他人看不见他，同时也不能碰触到他
+        /// </summary>
+        public void DisappearanceFromScene()
+        {
+            // 
+            GetComponent<PredictedRigidbody>().predictedRigidbody.interpolation = RigidbodyInterpolation.None;
+            GetComponent<PredictedRigidbody>().predictedRigidbody.isKinematic = true;
+            GetComponent<PredictedRigidbody>().predictedRigidbody.position = new Vector3(100000, 0, 0);
         }
 
         #region Mirror RPC
@@ -179,19 +204,21 @@ namespace Wugou.Multiplayer
             OnReceivePlayerMessage(player, message);
         }
 
+
         /// <summary>
-        /// 在其他实例上隐藏自身
+        /// 隐藏mesh和collider
         /// </summary>
+        /// <param name="allHide">true：所有客户端都隐藏，false：只在其它客户端隐藏</param>
         [Command]
-        public void CmdHideMeshAndCollidersOnOthers()
+        public void CmdHideMeshAndColliders(bool allHide)
         {
-            RpcHideMeshAndCollidersOnOthers();
+            RpcHideMeshAndColliders(allHide);
         }
 
         [ClientRpc]
-        private void RpcHideMeshAndCollidersOnOthers()
+        private void RpcHideMeshAndColliders(bool allHide)
         {
-            if (!isLocalPlayer)
+            if (allHide || !isLocalPlayer)
             {
                 foreach (var v in GetComponentsInChildren<Renderer>())
                 {
@@ -201,6 +228,13 @@ namespace Wugou.Multiplayer
                 foreach(var v in GetComponentsInChildren<Collider>())
                 {
                     v.enabled = false;
+                }
+
+                // 没有了碰撞，如果有刚体，则会往下掉
+                var rb = GetComponent<Rigidbody>();
+                if (rb)
+                {
+                    rb.isKinematic = true;
                 }
             }
 
@@ -271,6 +305,30 @@ namespace Wugou.Multiplayer
             // 暂时没有缓存的需求，先用删除
             //NetworkServer.UnSpawn(go);
             NetworkServer.Destroy(go);
+        }
+
+        [Command]
+        public void CmdSetPositionAndRotationInPredictedRigidbody(Vector3 position, Quaternion rotation)
+        {
+            var rigidbody = GetComponent<Rigidbody>();
+            rigidbody.position = position;
+            rigidbody.rotation = rotation;
+        }
+
+        [Command]
+        public void CmdSetGameEntityActive(int entityId, bool active)
+        {
+            RpcSetGameEntityActive(entityId, active);
+        }
+
+        [ClientRpc]
+        private void RpcSetGameEntityActive(int entityId, bool active)
+        {
+            var entity = GameWorld.GetGameEntity(entityId);
+            if (entity)
+            {
+                entity.SetActive(active);
+            }
         }
 
         #endregion

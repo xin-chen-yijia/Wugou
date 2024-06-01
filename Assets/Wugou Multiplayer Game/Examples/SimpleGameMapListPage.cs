@@ -109,7 +109,7 @@ namespace Wugou.Examples.UI
                         }
 
                         //É¾³ý½Å±¾ºÍ¼ÇÂ¼
-                        SimpleNonGamingSystem.gameMapManager.Remove(mapProj.name);
+                        SimpleNonGamingSystem.gameMapManager.Delete(mapProj.name);
 
                         //ui delete
                         GameObject.Destroy(item.gameObject);

@@ -9,7 +9,6 @@ using System;
 
 namespace Wugou
 {
-    [HasGameComponentView]
     [CustomGameComponentView(typeof(PathWalkerView))]
     public class PathWalker : GameComponent
     {

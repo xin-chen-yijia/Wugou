@@ -19,6 +19,11 @@ namespace Wugou.Editor
         List<Transaction> transactions_ = new List<Transaction>();
         private int index_ = -1;
 
+        public int GetIndex()
+        {
+            return index_;
+        }
+
         public bool CanUndo()
         {
             return index_ > -1 && transactions_.Count > 0;

@@ -84,7 +84,7 @@ namespace Wugou
             parser_.Save($"{path}/{name}", item, overwrite);
         }
 
-        public void Remove(string name)
+        public void Delete(string name)
         {
             string fullPath = $"{path}/{name}";
             if (Directory.Exists(fullPath))

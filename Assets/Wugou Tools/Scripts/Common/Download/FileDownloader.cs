@@ -69,6 +69,8 @@ namespace Wugou
                         }
                         break;
                 }
+
+                request_ = null;
             }
         }
 
@@ -77,6 +79,7 @@ namespace Wugou
             if(request_ != null)
             {
                 request_.Abort();
+                request_ = null;
             }
         }
 

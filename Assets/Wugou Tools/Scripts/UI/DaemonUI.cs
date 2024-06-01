@@ -12,27 +12,31 @@ namespace Wugou.UI
         {
             get
             {
-                CreateInstance();
+                if (_Instance == null)
+                {
+                    var pfb = Resources.Load<GameObject>(prefabName);
+                    if (!pfb)
+                    {
+                        Logger.Error($"Threre no prefab {prefabName} in resources..");
+                    }
+                    else
+                    {
+                        var obj = GameObject.Instantiate<GameObject>(pfb);
+                        GameObject.DontDestroyOnLoad(obj);
+                        _Instance = obj.GetComponent<UIRootWindow>();
+                    }
+
+                }
                 return _Instance;
             }
         }
 
-
-        private static void CreateInstance()
+        public static void HideAllWindow()
         {
-            if (_Instance == null)
+            for(int i=0;i<Instance.transform.childCount;i++)
             {
-                var pfb = Resources.Load<GameObject>(prefabName);
-                if (!pfb)
-                {
-                    Logger.Error($"Threre no prefab {prefabName} in resources..");
-                    return;
-                }
-                var obj = GameObject.Instantiate<GameObject>(pfb);
-                GameObject.DontDestroyOnLoad(obj);
-                _Instance = obj.GetComponent<UIRootWindow>();
+                Instance.transform.GetChild(i).GetComponent<UIBaseWindow>()?.Hide();
             }
-
         }
 
         public static LoadingScenePage loadingPage => Instance.GetChildWindow<LoadingScenePage>();

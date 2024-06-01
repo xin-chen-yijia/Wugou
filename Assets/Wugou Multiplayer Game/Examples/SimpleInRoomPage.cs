@@ -117,7 +117,8 @@ namespace Wugou.Examples.UI
                     var us = Gameplay.unitySceneManager.Get(v);
                     if (us.scene == gameMap.scene)
                     {
-                        mapIconImage.sprite = await GameAssetDatabase.GetAssetAsync<Sprite>(us.thumbnail);
+                        var tex = await GameAssetDatabase.GetAssetAsync<Texture2D>(us.thumbnail);
+                        mapIconImage.sprite = Utils.CreateSprite(tex);
                         break;
                     }
                 }

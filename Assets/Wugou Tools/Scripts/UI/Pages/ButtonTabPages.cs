@@ -7,6 +7,9 @@ using UnityEngine.UI;
 
 namespace Wugou.UI
 {
+    /// <summary>
+    /// 模拟tab页
+    /// </summary>
     public class ButtonTabPages : MonoBehaviour
     {
         [Serializable]
@@ -18,6 +21,7 @@ namespace Wugou.UI
         }
 
         public List<TabDetail> tabs = new List<TabDetail>();
+        public bool allowSwitchOff = false; // 必须选一个
 
         public bool isTextTransition = false;
         public Color textNormalColor = Color.white;
@@ -49,14 +53,35 @@ namespace Wugou.UI
             isInited = true;
             for(int i=0;i<tabs.Count;++i)
             {
-                ToggleTab(tabs[i], false);
+                Toggle(tabs[i], false);
 
-                int tmp = i;
-                tabs[i].tab.GetComponentInChildren<Button>().onClick.AddListener(() =>
-                {
-                    Toggle(tmp);
-                });
+                InitTab(i);
             }
+        }
+
+        private void InitTab(int index)
+        {
+            var button = tabs[index].tab.GetComponentInChildren<Button>();
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(() =>
+            {
+                if (allowSwitchOff)
+                {
+                    if (tabs[index].isChecked)
+                    {
+                        Toggle(tabs[index],false);
+                        activeTab_ = null;
+                    }
+                    else
+                    {
+                        Toggle(index);
+                    }
+                }
+                else
+                {
+                    Toggle(index);
+                }
+            });
         }
 
         private void ApplyTextColor(GameObject tab, bool isChecked)
@@ -77,23 +102,20 @@ namespace Wugou.UI
 
             if(activeTab_ != null)
             {
-                ToggleTab(activeTab_, false);
+                Toggle(activeTab_, false);
             }
-            ToggleTab(tabs[index], true);
+            Toggle(tabs[index], true);
             activeTab_ = tabs[index];
         }
 
-        private GameObject lastCheckObj_;
-        private void ToggleTab(TabDetail tab, bool isChecked)
+        private void Toggle(TabDetail tab, bool isChecked)
         {
             tab.isChecked = isChecked;
             tab.page.SetActive(isChecked);
             ApplyTextColor(tab.tab.gameObject, isChecked);
 
             // checked
-            lastCheckObj_?.SetActive(false);
-            lastCheckObj_ = tab.tab.transform.Find("Checked")?.gameObject;
-            lastCheckObj_?.SetActive(true);
+            tab.tab.transform.Find("Checked")?.gameObject.SetActive(isChecked);
         }
 
         public void AddTab(GameObject tab, GameObject page)
@@ -105,11 +127,32 @@ namespace Wugou.UI
             };
             tabs.Add(detail);
 
-            int tmp = tabs.Count - 1;
-            tab.GetComponentInChildren<Button>().onClick.AddListener(() =>
+            InitTab(tabs.Count - 1);
+        }
+
+        public void RemoveTab(string name)
+        {
+            for (int i = 0; i < tabs.Count; i++)
             {
-                Toggle(tmp);
-            });
+                if (tabs[i].tab.name == name)
+                {
+                    if(activeTab_ == tabs[i])
+                    {
+                        activeTab_ = null;
+                    }
+
+                    Destroy(tabs[i].tab);
+                    Destroy(tabs[i].page);
+                    tabs.RemoveAt(i);
+
+                    Init(true);
+                    if (activeTab_ != null)
+                    {
+                        Toggle(activeTab_, true);
+                    }
+                    break;
+                }
+            }
         }
     }
 }

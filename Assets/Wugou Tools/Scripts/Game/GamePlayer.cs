@@ -5,14 +5,37 @@ using UnityEngine.EventSystems;
 
 namespace Wugou
 {
+    /// <summary>
+    /// 角色可选择
+    /// </summary>
+    public interface IGamePlayerChosen
+    {
+        public void OnGamePlayerChosen(GamePlayer player, GameObject hitObj);
+    }
+
+    /// <summary>
+    /// 代表当前玩家控制的角色
+    /// </summary>
     public class GamePlayer : MonoBehaviour
     {
         public static GamePlayer instance { get; private set; }
 
-        public GameObject body { get; protected set; } // 从assetbundle中加载的角色模型
+        public virtual Camera playerCamera { get; }
 
-        protected Camera mainCam;
+        [Tooltip("拾取物体射线的最长距离")]
         public float maxSelectDistance = 100;
+
+        /// <summary>
+        /// 点击物体，触发IGamePlayerChosen
+        /// </summary>
+        public bool enableGameObjectChosen { get; set; } = true;
+
+        public GameObject selectedObject { get; protected set; }
+
+        /// <summary>
+        /// 鼠标所悬停在的物体
+        /// </summary>
+        private GameObject hoverObject_ = null;
 
         public virtual void Awake()
         {
@@ -22,44 +45,69 @@ namespace Wugou
         // Start is called before the first frame update
         public virtual void Start()
         {
-            Init();
-            mainCam = Camera.main;
         }
 
         // Update is called once per frame
         public virtual void Update()
         {
-            // 判断是否在UI上
-            if (!EventSystem.current || !EventSystem.current.IsPointerOverGameObject())
+            if (hoverObject_)
             {
-                if (Input.GetMouseButtonDown(0))
+                OutlineEffect.DisableOutline(hoverObject_);
+                hoverObject_ = null;
+            }
+
+            // 判断是否在UI上
+            if (enableGameObjectChosen && !Utils.IsPointerOnUI() && playerCamera)
+            {
+                RaycastHit hit;
+                Ray ray = playerCamera.ScreenPointToRay(Input.mousePosition);
+                //Debug.DrawRay(ray.origin, ray.origin + ray.direction * 100, Color.red);
+                if (Physics.Raycast(ray, out hit, maxSelectDistance))
                 {
-                    RaycastHit hit;
-                    Ray ray = mainCam.ScreenPointToRay(Input.mousePosition);
-                    if (Physics.Raycast(ray, out hit, maxSelectDistance))
+                    var hitObj = hit.collider.gameObject;
+                    if (hitObj.GetComponentInParent<GameEntity>())
                     {
-                        var hitObj = hit.collider.gameObject;
-                        OnSelectObject(hit.collider.gameObject);
-                        foreach(var v in hitObj.GetComponentsInParent<GameComponent>())
+                        hoverObject_ = hitObj;
+
+                        if (Input.GetMouseButtonDown(0))  // playerCamera 可能会禁用
                         {
-                            v.OnPlayerChosen(this,hitObj);
+                            selectedObject = hoverObject_;
+                            OnSelectObject(hit.collider.gameObject);
+
+                            foreach (var v in hoverObject_.GetComponentsInParent<IGamePlayerChosen>())
+                            {
+                                v.OnGamePlayerChosen(this, hoverObject_);
+                            }
                         }
+
+                        OutlineEffect.AddOrEnableOutline(hoverObject_);
+                    }
+                }
+                else
+                {
+                    if (Input.GetMouseButtonDown(0))
+                    {
+                        selectedObject = null;
                     }
                 }
             }
         }
 
-        private void Init()
+        /// <summary>
+        /// 启用描边
+        /// </summary>
+        public void EnableOutline()
         {
-            InstantiateBody();
+            OutlineEffect.Apply(playerCamera);
+            OutlineEffect.enable = true;
         }
 
         /// <summary>
-        /// 实例化Body的模型
+        /// 禁用描边
         /// </summary>
-        protected virtual void InstantiateBody()
+        public void DisableOutline()
         {
-            Wugou.Logger.Error("Not InstantiateBody, the body property will be null..");
+            OutlineEffect.enable = false;
         }
 
         protected virtual void OnSelectObject(GameObject go)

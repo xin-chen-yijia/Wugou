@@ -9,15 +9,19 @@ namespace Wugou.Editor.UI
 {
     public class MapEditorPage : UIBaseWindow
     {
+        public TMP_Text headText;
         public Button quitButton;
         public Button buildButton;
-        public Button previewButton;
-        public Button editorSpaceButton;
+        public Toggle previewToggle;
+
+        public Toggle editorSpaceToggle;
+        public Toggle forwardNormalToggle;
+        public Toggle perspectiveToggle;
 
         // Start is called before the first frame update
         void Start()
         {
-            GameMapEditor.instance.editorAxis.onOptionModeChanged.AddListener((mode) =>
+            GameMapEditor.instance?.editorAxis.onOptionModeChanged.AddListener((mode) =>
             {
                 //
                 switch (mode)
@@ -51,32 +55,25 @@ namespace Wugou.Editor.UI
                 GameMapEditor.instance.Quit();
             });
 
-            bool isPreview = false;
-            previewButton.onClick.AddListener(() =>
+            previewToggle.onValueChanged.AddListener((value) =>
             {
-                isPreview = !isPreview;
-                //
-                GameMapEditor.instance.SwitchPreviewMode(isPreview);
-                previewButton.transform.Find("Checked")?.gameObject.SetActive(isPreview);
+                GameMapEditor.instance.SwitchPreviewMode(value);
             });
 
-            editorSpaceButton.onClick.AddListener(() =>
+            editorSpaceToggle.onValueChanged.AddListener((value) =>
             {
-                var space = GameMapEditor.instance.editorAxis.space;
-                if(space == Space.World)
-                {
-                    space = Space.Self;
-                }
-                else
-                {
-                    space = Space.World;
-                }
-
-                GameMapEditor.instance.editorAxis.space = space;
-
-                editorSpaceButton.GetComponentInChildren<TMP_Text>().text = space == Space.World ? "世界" : "本地";
+                GameMapEditor.instance.editorAxis.space = value ? Space.World : Space.Self;
             });
 
+            forwardNormalToggle.onValueChanged.AddListener((value) =>
+            {
+                GameMapEditor.instance.placeGameEntityForwardHitNormal = value;
+            });
+
+            perspectiveToggle.onValueChanged.AddListener((value) =>
+            {
+                GameMapEditor.instance.SetOrtho(value);
+            });
         }
 
         //// Update is called once per frame
@@ -87,7 +84,7 @@ namespace Wugou.Editor.UI
 
         public void SetHead(string head)
         {
-            transform.Find("Top/Head").GetComponent<TMP_Text>().text = head;
+            headText.text = head;
         }
 
         public void OnViewOptionToggle(bool isOn)

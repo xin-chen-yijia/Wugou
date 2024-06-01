@@ -1,10 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using static UnityEngine.GraphicsBuffer;
 
 namespace Wugou
 {
+    /// <summary>
+    /// 查看模型，单独使用相机渲染某一个模型到纹理上，常用场景就是：游戏角色展示
+    /// </summary>
     public class ModelCloseUpBooth
     {
         public static int boothLayer { get; set; } = 2; // 摄像只看这一层的对象

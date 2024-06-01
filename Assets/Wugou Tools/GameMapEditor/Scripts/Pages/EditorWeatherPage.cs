@@ -3,10 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using Wugou.Editor;
 using Wugou.UI; 
-using UnityEngine.Events;
-using System;
 
 namespace Wugou.Editor.UI {
     public class EditorWeatherPage : UIBaseWindow
@@ -18,23 +15,34 @@ namespace Wugou.Editor.UI {
         public Slider timeSlider;
         public Slider fogSlider;
         public TMP_Dropdown windForceDropdown;
+        public TMP_Dropdown windDirDropdown;
 
         private void Awake()
         {
             GameMapEditor.onLoadedMap.AddListener(() =>
             {
-                SetOptions(WeatherSystem.allWeatherNames);
+                if (GameWorld.loadedMap.needWeather)
+                {
+                    SetOptions(new List<string>(Gameplay.weatherSystem.GetAllWeatherNames()));
 
-                var weather = WeatherSystem.activeWeather;
-                Logger.DebugInfo($"weather time:{weather.time}");
-                timeSlider.SetValueWithoutNotify(weather.time);
-                weatherTypeDropdown.SetValueWithoutNotify(weather.type);
-                fogSlider.SetValueWithoutNotify(weather.fogDensity);
+                    var weatherSys = Gameplay.weatherSystem;
+                    Logger.DebugInfo($"weather time:{weatherSys.time}");
+                    timeSlider.SetValueWithoutNotify(weatherSys.time);
+                    weatherTypeDropdown.SetValueWithoutNotify(weatherSys.weatherType);
+                    fogSlider.SetValueWithoutNotify(weatherSys.fogDensity);
+                    windForceDropdown.SetValueWithoutNotify(Mathf.RoundToInt(windForceDropdown.options.Count * weatherSys.windForce) - 1);
+                    windDirDropdown.SetValueWithoutNotify(Mathf.RoundToInt(windDirDropdown.options.Count * weatherSys.windDirection));
+                }
+                else
+                {
+                    Hide();
+                }
+
             });
         }
 
         // Start is called before the first frame update
-        async void Start()
+        void Start()
         {
             okButton.onClick.AddListener(() =>
             {
@@ -48,49 +56,30 @@ namespace Wugou.Editor.UI {
 
             weatherTypeDropdown.onValueChanged.AddListener((int index) =>
             {
-                GameMapEditor.instance.loadedGameMap.weather.type = index;
-                var weather = WeatherSystem.activeWeather;
-                weather.type = index;
-                WeatherSystem.activeWeather = weather;
-                WeatherSystem.ApplyWeather();
+                Gameplay.weatherSystem.ChangeWeather(index, false);
             });
 
             timeSlider.onValueChanged.AddListener((float value) =>
             {
-                GameMapEditor.instance.loadedGameMap.weather.time = value;
-                var weather = WeatherSystem.activeWeather;
-                weather.time = value;
-                WeatherSystem.activeWeather = weather;
-                WeatherSystem.ApplyWeather();
+                Gameplay.weatherSystem.time = (value);
             });
 
             fogSlider.onValueChanged.AddListener((float value) =>
             {
-                GameMapEditor.instance.loadedGameMap.weather.fogDensity = value;
-                var weather = WeatherSystem.activeWeather;
-                weather.fogDensity = value;
-                WeatherSystem.activeWeather = weather;
-                WeatherSystem.ApplyWeather();
+                Gameplay.weatherSystem.fogDensity = (value);
             });
 
             windForceDropdown.onValueChanged.AddListener((value) =>
             {
-                float force = (value + 1) * 1;
-                GameMapEditor.instance.loadedGameMap.weather.windSpeed= force;    // 记录，用于保存
-                var weather = WeatherSystem.activeWeather;
-                weather.windSpeed = force;
-                WeatherSystem.activeWeather = weather;
-                WeatherSystem.ApplyWeather();
+                float force = (value + 1) * 1.0f / windForceDropdown.options.Count;
+                Gameplay.weatherSystem.windForce = (force);
             });
 
-            //transform.Find("Main/WindDir/Value").GetComponent<Slider>().onValueChanged.AddListener((float value) =>
-            //{
-            //    MapEditorSystem.instance.loadedGameMap.weather.windDir = value;
-            //    var weather = WeatherSystem.activeWeather;
-            //    weather.windDir = value;
-            //    WeatherSystem.activeWeather = weather;
-            //    WeatherSystem.ApplyWeather();
-            //});
+            windDirDropdown.onValueChanged.AddListener((value) =>
+            {
+                var dirVal = value * 1.0f / (windDirDropdown.options.Count);
+                Gameplay.weatherSystem.windDirection = (dirVal);
+            });
         }
 
         // Update is called once per frame

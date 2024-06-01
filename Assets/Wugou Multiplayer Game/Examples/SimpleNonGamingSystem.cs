@@ -15,6 +15,8 @@ namespace Wugou.Examples
     {
         public static FileAssetsManager<GameMap> gameMapManager { get; private set; }
 
+        public static FileAssetsManager<SimpleGameStats> gameStatsManager { get; private set; }
+
         public UIRootWindow rootWindow;
 
         public void Start()
@@ -28,33 +30,21 @@ namespace Wugou.Examples
             gameMapManager = new FileAssetsManager<GameMap>($"{Gameplay.downloadGameMapsPath}", ".map", new GameMapFileParser());
 
             // 游戏记录管理
-            Gameplay.gameStatsManager = new FileAssetsManager<GameStats>($"{Application.persistentDataPath}/gamestats",".gt");
+            gameStatsManager = new FileAssetsManager<SimpleGameStats>($"{Application.persistentDataPath}/gamestats",".gt");
 
             StartCoroutine(DelayDo());
-
-            WeatherSystem.Load = () =>
-            {
-
-            };
-            //
-            WeatherSystem.ApplyWeather = () =>
-            {
-                // do nothing
-            };
-
-            WeatherSystem.Clear = () => { };
         }
 
         IEnumerator DelayDo()
         {
             yield return null;
 
-            if (Gameplay.lastGameStats != null)
+            if (SimpleGameStats.lastGameStats != null)
             {
                 rootWindow.GetChildWindow<SimpleHomePage>().Toggle(SimpleHomePage.StatisticPageId);
                 rootWindow.GetChildWindow<SimpleStatisticPage>().SelectLastest();
 
-                Gameplay.lastGameStats = null;
+                SimpleGameStats.lastGameStats = null;
             }
         }
     }

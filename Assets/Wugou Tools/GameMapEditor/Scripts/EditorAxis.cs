@@ -41,7 +41,6 @@ namespace Wugou.Editor
 
         public GameObject selectedObject { get; private set; }
         public bool isDragging { get; private set; }
-        public bool isDraggingAxis { get { return axisName != kEmptyAxisName;  } }
 
         public enum Mode
         {
@@ -56,11 +55,11 @@ namespace Wugou.Editor
         public UnityEvent<Mode> onOptionModeChanged = new UnityEvent<Mode>();
 
         public const string kEmptyAxisName = "NULL";
-        public string axisName { get; private set; } = kEmptyAxisName;
-        private string lastAxisName_ = kEmptyAxisName;
+        public string activeAxisName { get; private set; } = kEmptyAxisName;
+        private string lastActiveAxisName_ = kEmptyAxisName;
 
         // 排除了坐标轴之类的物体的层
-        public int mainLayerMask { get; set; } = 1; // 默认就default
+        public int layer { get; set; } = 1; // 默认就default
 
         /// <summary>
         /// 看向物体的视线方向
@@ -251,25 +250,7 @@ namespace Wugou.Editor
                 {
                     space = Space.World;
                 }
-
-                print(space);
             }
-
-            if (Input.GetKeyDown(KeyCode.W))
-            {
-                SetOptionMode(Mode.kTranslate);
-            }
-
-            if (Input.GetKey(KeyCode.E))
-            {
-                SetOptionMode(Mode.kRotate);
-            }
-
-            if (Input.GetKey(KeyCode.R))
-            {
-                SetOptionMode(Mode.kScale);
-            }
-
 
             if (editorCamera.orthographic)
             {
@@ -285,7 +266,7 @@ namespace Wugou.Editor
 
             Ray ray = editorCamera.ScreenPointToRay(Input.mousePosition);
             RaycastHit hit;
-            if (selfFindTarget && Physics.Raycast(ray, out hit, maxRaycastDistance, mainLayerMask))
+            if (selfFindTarget && Physics.Raycast(ray, out hit, maxRaycastDistance, layer))
             {
                 if (Input.GetMouseButtonDown(0) )
                 {
@@ -313,12 +294,12 @@ namespace Wugou.Editor
                 {
                     if (Physics.Raycast(ray, out hit, maxRaycastDistance, 1 << toolLayer))
                     {
-                        axisName = hit.collider.name;
+                        activeAxisName = hit.collider.name;
                         UpdateControlPlane();   // 实时更新辅助板，TODO：每次轴变化时更新
                     }
                     else
                     {
-                        axisName = kEmptyAxisName;
+                        activeAxisName = kEmptyAxisName;
                     }
                 }
 
@@ -337,9 +318,9 @@ namespace Wugou.Editor
                                     offset = Quaternion.Inverse(selectedObject.transform.rotation) * offset;
                                 }
 
-                                if (!axisName.Contains("X")) offset.x = 0;
-                                if (!axisName.Contains("Y")) offset.y = 0;
-                                if (!axisName.Contains("Z")) offset.z = 0;
+                                if (!activeAxisName.Contains("X")) offset.x = 0;
+                                if (!activeAxisName.Contains("Y")) offset.y = 0;
+                                if (!activeAxisName.Contains("Z")) offset.z = 0;
 
                                 if (space == Space.Self)
                                 {
@@ -354,15 +335,15 @@ namespace Wugou.Editor
                                 bool inPlaneRotation = false;
                                 float rotateAngle = 0;
                                 Vector3 rotateAixs = Vector3.right;
-                                if (axisName == "XYZE")
+                                if (activeAxisName == "XYZE")
                                 {
                                     rotateAixs = Vector3.Cross(eyeForward, rv).normalized;
                                     rotateAngle = Vector3.Dot(rv, Vector3.Cross(eyeForward, rotateAixs)) * ROTATION_SPEED;
 
                                 }
-                                else if (axisName == "X" || axisName == "Y" || axisName == "Z")
+                                else if (activeAxisName == "X" || activeAxisName == "Y" || activeAxisName == "Z")
                                 {
-                                    rotateAixs = axisName == "X" ? Vector3.right : axisName == "Y" ? Vector3.up : Vector3.forward;
+                                    rotateAixs = activeAxisName == "X" ? Vector3.right : activeAxisName == "Y" ? Vector3.up : Vector3.forward;
                                     var temp = rotateAixs;
                                     if (space == Space.Self)
                                     {
@@ -381,7 +362,7 @@ namespace Wugou.Editor
                                     }
                                 }
 
-                                if (axisName == "E" || inPlaneRotation)
+                                if (activeAxisName == "E" || inPlaneRotation)
                                 {
                                     rotateAixs = eyeForward;
                                     rotateAngle = Vector3.Angle(pointStart_, pointEnd_);
@@ -389,7 +370,7 @@ namespace Wugou.Editor
                                 }
 
                                 // apply roation
-                                if (space == Space.Self && axisName != "E" && axisName != "XYZE")
+                                if (space == Space.Self && activeAxisName != "E" && activeAxisName != "XYZE")
                                 {
                                     selectedObject.transform.rotation = quaternionStart_ * Quaternion.AngleAxis(rotateAngle, rotateAixs);
                                 }
@@ -400,7 +381,7 @@ namespace Wugou.Editor
 
                                 break;
                             case Mode.kScale:
-                                if (axisName == "XYZ")
+                                if (activeAxisName == "XYZ")
                                 {
                                     float d = pointEnd_.magnitude / pointStart_.magnitude;
                                     if (Vector3.Dot(pointStart_, pointEnd_) < 0)
@@ -416,15 +397,15 @@ namespace Wugou.Editor
                                     var v2 = pointEnd_;
 
                                     var v = new Vector3(v2.x / v1.x, v2.y / v1.y, v2.z / v1.z);
-                                    if (!axisName.Contains("X"))
+                                    if (!activeAxisName.Contains("X"))
                                     {
                                         v.x = 1;
                                     }
-                                    if (!axisName.Contains("Y"))
+                                    if (!activeAxisName.Contains("Y"))
                                     {
                                         v.y = 1;
                                     }
-                                    if (!axisName.Contains("Z"))
+                                    if (!activeAxisName.Contains("Z"))
                                     {
                                         v.z = 1;
                                     }
@@ -457,18 +438,18 @@ namespace Wugou.Editor
             if (Input.GetMouseButtonUp(0))
             {
                 isDragging = false;
-                axisName = kEmptyAxisName;
+                activeAxisName = kEmptyAxisName;
             }
 
             // axis highlight
-            if (lastAxisName_ != axisName)
+            if (lastActiveAxisName_ != activeAxisName)
             {
-                lastAxisName_ = axisName;
+                lastActiveAxisName_ = activeAxisName;
                 var yellow = new Color(1, 1, 0, 0.5f);
-                var axisCharList = axisName.ToList();
+                var axisCharList = activeAxisName.ToList();
                 foreach (var t in axis.transform.GetComponentsInChildren<Renderer>())
                 {
-                    if (t.name == axisName
+                    if (t.name == activeAxisName
                        || t.name.ToList().All((c) => { return axisCharList.Contains(c); }))
                     {
                         if (!oldAxisColors_.ContainsKey(t.gameObject))
@@ -506,7 +487,7 @@ namespace Wugou.Editor
             {
                 case Mode.kTranslate:
                 case Mode.kScale:
-                    switch (axisName)
+                    switch (activeAxisName)
                     {
                         case "X":
                             alignVec = Vector3.Cross(v1, eyeForward);
@@ -659,6 +640,8 @@ namespace Wugou.Editor
             translateParent.gameObject.SetActive(false);
             rotateParent.gameObject.SetActive(false);
             scaleParent.gameObject.SetActive(false);
+
+            isDragging = false;
         }
     }
 }

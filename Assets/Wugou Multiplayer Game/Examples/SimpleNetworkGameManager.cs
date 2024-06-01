@@ -21,6 +21,8 @@ namespace Wugou.Examples
     /// </summary>
     public class SimpleGameStats : GameStats
     {
+        public static SimpleGameStats lastGameStats = null;
+
         public Dictionary<string, SimpleGameSnapshot> playerStats = new Dictionary<string, SimpleGameSnapshot>();
     }
 
@@ -68,12 +70,12 @@ namespace Wugou.Examples
             gameStats.name = "replay_" + System.DateTime.Now.ToFileTimeUtc();
             gameStats.gamemap = gameMapPackage.path.Replace("\\", "/").Replace(Gameplay.gameMapManager.path, "");
             gameStats.duration = Time.realtimeSinceStartup;
-            Gameplay.lastGameStats = gameStats;
+            SimpleGameStats.lastGameStats = gameStats;
         }
 
         public override void UpdateGameplayerSnapshot(MultiplayerGamePlayer player)
         {
-            var gameStats = Gameplay.lastGameStats as SimpleGameStats;
+            var gameStats = SimpleGameStats.lastGameStats;
             gameStats.playerStats[player.name] = new SimpleGameSnapshot() { name = "Jack", score = 100 };
         }
 

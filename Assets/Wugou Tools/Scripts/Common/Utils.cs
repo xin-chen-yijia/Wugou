@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.EventSystems;
 using UnityEngine.Networking;
 using UnityEngine.UI;
 
@@ -220,13 +221,17 @@ namespace Wugou
             await new YieldInstructionAwaiter(null);
 
             //var size = container.GetComponent<RectTransform>().sizeDelta;
-            var layout = container.GetComponent<LayoutGroup>();
+            if(container.transform.childCount > 0)
+            {
+                var layout = container.GetComponent<LayoutGroup>();
 
-            var firstChild = container.transform.GetChild(0).GetComponent<RectTransform>();
-            var lastChild = container.transform.GetChild(container.transform.childCount - 1).GetComponent<RectTransform>();
-            //size.y = layout.padding.top + layout.padding.bottom + (-(lastChild.localPosition.y - firstChild.localPosition.y)) + firstChild.GetComponent<RectTransform>().sizeDelta.y * 0.5f + lastChild.GetComponent<RectTransform>().sizeDelta.y * 0.5f;
+                var firstChild = container.transform.GetChild(0).GetComponent<RectTransform>();
+                var lastChild = container.transform.GetChild(container.transform.childCount - 1).GetComponent<RectTransform>();
+                //size.y = layout.padding.top + layout.padding.bottom + (-(lastChild.localPosition.y - firstChild.localPosition.y)) + firstChild.GetComponent<RectTransform>().sizeDelta.y * 0.5f + lastChild.GetComponent<RectTransform>().sizeDelta.y * 0.5f;
 
-            container.GetComponent<RectTransform>().SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, layout.padding.top + layout.padding.bottom + (-(lastChild.localPosition.y - firstChild.localPosition.y)) + firstChild.GetComponent<RectTransform>().sizeDelta.y * 0.5f + lastChild.GetComponent<RectTransform>().sizeDelta.y * 0.5f);
+                container.GetComponent<RectTransform>().SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, layout.padding.top + layout.padding.bottom + (-(lastChild.localPosition.y - firstChild.localPosition.y)) + firstChild.GetComponent<RectTransform>().sizeDelta.y * 0.5f + lastChild.GetComponent<RectTransform>().sizeDelta.y * 0.5f);
+            }
+
         }
 
         /// <summary>
@@ -299,47 +304,18 @@ namespace Wugou
         /// <param name="filePath"></param>
         /// <param name="pivot"></param>
         /// <returns></returns>
-        public static Sprite LoadSpriteFromFile(string filePath, Vector2 pivot)
+        public static Sprite CreateSprite(Texture2D texture)
         {
-            var texture = LoadTextureFromFile(filePath);
-            if (!texture)
-            {
-                return null;
-            }
+            return CreateSprite(texture, new Rect(0, 0, texture.width, texture.height));
+        }
 
+        public static Sprite CreateSprite(Texture2D texture, Rect rect)
+        {
             //创建Sprite
-            Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), pivot);
+            Sprite sprite = Sprite.Create(texture, rect, new Vector2(0.5f, 0.5f));
             return sprite;
         }
 
-        /// <summary>
-        /// 使用协程加载本地文件为sprite
-        /// </summary>
-        /// <param name="filePath"></param>
-        /// <param name="pivot"></param>
-        /// <param name="onLoaded"></param>
-        /// <param name="useCache"></param>
-        public static void LoadSpriteFromFileWithWebRequest(string filePath, Vector2 pivot, UnityAction<Sprite> onLoaded, bool useCache = true)
-        {
-            CoroutineLauncher.active.StartCoroutine(LoadTexture2D(filePath, pivot, onLoaded));
-        }
-
-        private static IEnumerator LoadTexture2D(string path, Vector2 pivot, UnityAction<Sprite> onLoaded)
-        {
-            UnityWebRequest request = UnityWebRequestTexture.GetTexture(path);
-            yield return request.SendWebRequest();
-
-            if (request.result == UnityWebRequest.Result.Success)
-            {
-                var texture = DownloadHandlerTexture.GetContent(request);
-                Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
-                onLoaded?.Invoke(sprite);
-            }
-            else
-            {
-                Wugou.Logger.Error($"Load {path} fail.. error:{request.error}");
-            }
-        }
 
         /// <summary>
         /// 复制某个组件及其序列化的值
@@ -793,6 +769,53 @@ namespace Wugou
 #else
             return false;
 #endif
+        }
+
+        /// <summary>
+        /// 判断鼠标是否在UI上
+        /// </summary>
+        /// <returns></returns>
+        public static bool IsPointerOnUI()
+        {
+            return EventSystem.current && EventSystem.current.IsPointerOverGameObject();
+        }
+
+        /// <summary>
+        /// 计算图片裁切区域，避免拉升或压缩，策略：适配短边，裁切长边
+        /// </summary>
+        /// <param name="imageWidth"></param>
+        /// <param name="imageHeight"></param>
+        /// <param name="containerWidth"></param>
+        /// <param name="containerHeight"></param>
+        /// <returns>归一化的矩形区域</returns>
+        public static Rect AdaptiveImageRect(float imageWidth, float imageHeight, float containerWidth, float containerHeight)
+        {
+            var radio1 = imageWidth / imageHeight;
+            var radio2 = containerWidth / containerHeight;
+
+            if (radio1 > radio2)
+            {
+                var t = (radio1 / radio2 - 1.0f) * 0.5f;
+                return new Rect(t, 0, 1.0f - t, 1);
+            }
+            else
+            {
+                var t = (radio2 / radio1 - 1.0f) * 0.5f;
+                return new Rect(0, t, 1, 1.0f - t);
+            }
+        }
+
+        /// <summary>
+        /// 让image自适应图片，避免拉升的感觉
+        /// </summary>
+        /// <param name="image"></param>
+        public static void AdaptiveResolution(this RawImage image)
+        {
+            var tex = image.texture;
+            if (tex)
+            {
+                image.uvRect = AdaptiveImageRect(tex.width, tex.height, image.GetComponent<RectTransform>().sizeDelta.x, image.GetComponent<RectTransform>().sizeDelta.y);
+            }
         }
     }
 }

@@ -11,9 +11,13 @@ namespace Wugou
     /// </summary>
     public static class GameWorld
     {
-
         // 记录已放置的物体，用于后续更改或删除
         public static List<GameEntity> gameEntities { get; private set; } = new List<GameEntity>();
+
+        /// <summary>
+        /// 所加载的场景中自带的GameEntity（非动态实例化出来的）
+        /// </summary>
+        private static List<GameEntity> gameEntitiesExistFromTheBeginning_ = new List<GameEntity>();
 
         /// <summary>
         /// Unity当前加载的场景
@@ -56,6 +60,24 @@ namespace Wugou
             foreach(var v in gameEntities)
             {
                 if(v.id == id)
+                {
+                    return v;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 获取一开始就存在于场景的GameEntity，主要用于实例化
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        internal static GameEntity GetGameEntityExistFromTheBeginning(int id)
+        {
+            foreach (var v in gameEntitiesExistFromTheBeginning_)
+            {
+                if (v.id == id)
                 {
                     return v;
                 }
@@ -210,6 +232,8 @@ namespace Wugou
                 }
             }
 
+            // TODO: 加载文件夹？
+
             return true;
         }
 
@@ -274,7 +298,7 @@ namespace Wugou
             int mapVersion = gameMap.version;
             if (mapVersion < GameMap.kLatestVersion)
             {
-                Logger.Error($"game map version {mapVersion} less than current supported version {GameMap.kLatestVersion}.");
+                Logger.Error($"game map version error. latest supported version is {GameMap.kLatestVersion}, but the version of game map to load is {mapVersion}.");
                 return Error.kErrorOldVersion;
             }
 
@@ -311,29 +335,85 @@ namespace Wugou
             await new YieldInstructionAwaiter(null);
             activeScene = SceneManager.GetSceneByName(sceneName.Replace(".unity",""));  // 不需要.unity的后缀
 
+            // 场景中已有的GameEntity
+            gameEntitiesExistFromTheBeginning_.AddRange(GameObject.FindObjectsOfType<GameEntity>(true));
+            gameEntities.AddRange(gameEntitiesExistFromTheBeginning_);
+
             // entity 实例化
             var entities = mapReader.ReadEntities();
             for (int i = 0; i < entities.Count; i++)
             {
                 var entity = entities[i];
-                await entity.InstantiateBody();
-                SceneManager.MoveGameObjectToScene(entity.gameObject, GameWorld.activeScene);
+                if (!entity.isFromTheBeginning) // added before
+                {
+                    await entity.InstantiateBody();
+                    //Utils.DoAsync(async () =>
+                    //{
+                    //    await entity.InstantiateBody();
+                    //});
+                    SceneManager.MoveGameObjectToScene(entity.gameObject, GameWorld.activeScene);
 
-                gameEntities.Add(entity);
+                    gameEntities.Add(entity);
+                }
+
+            }
+
+            // 加载额外的游戏相关逻辑 
+            if (Gameplay.isGaming)
+            {
+                // 加载GameScript
+                var pb = Resources.Load<GameObject>($"GameScripts/{gameMap.gameScript}");
+                if (pb)
+                {
+                    var obj = GameObject.Instantiate<GameObject>(pb);
+                    obj.name = $"GameScript {gameMap.gameScript}";
+                }
+                else
+                {
+                    Logger.Error($"GameScripts {gameMap.gameScript} not exists...");
+                }
+
+                // TODO: 加载js脚本
+
+            }
+
+            if (gameMap.needWeather)
+            {
+                Utils.DoAsync(async () =>
+                {
+                    // 加载天气系统
+                    Gameplay.weatherSystem.Load();
+
+                    await new YieldInstructionAwaiter(null);
+
+                    // 应用脚本中的天气
+                    Gameplay.weatherSystem.ChangeWeather(gameMap.weather.type);
+                    Gameplay.weatherSystem.time = (gameMap.weather.time);
+                    Gameplay.weatherSystem.fogDensity = (gameMap.weather.fogDensity);
+                    Gameplay.weatherSystem.windForce = (gameMap.weather.windForce);
+                    Gameplay.weatherSystem.windDirection = (gameMap.weather.windDir);
+                });
+
+            }
+
+            // 
+            foreach (var v in gameEntities)
+            {
+                v.GetComponent<ILoadedGameMap>()?.OnLoadedGameMap();
             }
 
             // check gamemap dependencies
             var mapDependencies = mapReader.ReadDependencies();
-            foreach(var v in mapDependencies)
+            foreach (var v in mapDependencies)
             {
                 var mountPoint = $"/{v.Key}";
                 var fs = GameAssetDatabase.GetFileSystem(mountPoint);
                 if (fs != null)
                 {
                     var abFS = fs as AssetBundleFileSystem;
-                    if(abFS != null)
+                    if (abFS != null)
                     {
-                        if(abFS.assetLoader.GetDescFileMD5() != v.Value)
+                        if (abFS.assetLoader.GetDescFileMD5() != v.Value)
                         {
                             Logger.Warning($"Assetbundle: {v.Key}'s md5 is not same with that in gamemap");
                         }
@@ -341,18 +421,7 @@ namespace Wugou
                 }
             }
 
-            if (gameMap.needWeather)
-            {
-                // 加载天气系统
-                WeatherSystem.Load();
-
-                // 应用脚本中的天气
-                WeatherSystem.activeWeather = gameMap.weather;
-                WeatherSystem.ApplyWeather();
-            }
-
-
-            // 加载新脚本
+            // 更新脚本
             loadedMap = gameMap;
 
             isLoading = false;
@@ -392,6 +461,7 @@ namespace Wugou
 
             // finally clear all gameobjects
             gameEntities.Clear();
+            gameEntitiesExistFromTheBeginning_.Clear();
 
             foreach (var v in loadedResources_)
             {
@@ -399,7 +469,8 @@ namespace Wugou
             }
 
             // 清理天气系统
-            WeatherSystem.Clear();
+            Gameplay.weatherSystem?.Clear();
+            Gameplay.weatherSystem = null;
 
             isLoading = false;
             loadingSceneOperation = null;

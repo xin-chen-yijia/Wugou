@@ -1,7 +1,6 @@
 using Wugou.Editor;
 using System.Collections;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using UnityEngine;
 using System;
 
@@ -124,11 +123,6 @@ namespace Wugou
 
         public static GameEntity DuplicateGameEntity(GameEntity entity)
         {
-            if (!entity)
-            {
-                return null;
-            }
-
             var newEntity = GameObject.Instantiate<GameObject>(entity.gameObject);
             var entityComp = newEntity.GetComponent<GameEntity>();
             entityComp.id = AllocateEntityId();
@@ -146,7 +140,10 @@ namespace Wugou
         {
             {"Default", Resources.Load<GameObject>("DefaultGameEntityPrototypes/Default") },
             {"StartPosition", Resources.Load<GameObject>("DefaultGameEntityPrototypes/StartPosition") },
-            {"Trigger", Resources.Load<GameObject>("DefaultGameEntityPrototypes/Trigger") }
+            {"Trigger", Resources.Load<GameObject>("DefaultGameEntityPrototypes/Trigger") },
+            {"TextBoard", Resources.Load<GameObject>("DefaultGameEntityPrototypes/TextBoard") },
+            {"InformationBox", Resources.Load<GameObject>("DefaultGameEntityPrototypes/InformationBox") },
+            {"CameraPose", Resources.Load<GameObject>("DefaultGameEntityPrototypes/CameraPose") },
         };
         public static void RegisterPrototype(string type, GameObject prefab)
         {

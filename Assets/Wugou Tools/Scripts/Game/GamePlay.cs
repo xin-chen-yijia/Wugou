@@ -7,6 +7,9 @@ using Wugou.Editor;
 
 namespace Wugou
 {
+    /// <summary>
+    /// 游戏的一些管理配置
+    /// </summary>
     public static class Gameplay
     {
         private static GamePlaySettings settings_ = null;
@@ -16,10 +19,15 @@ namespace Wugou
             {
                 if (settings_ == null)
                 {
-#if DEVELOPMENT || UNITY_EDITOR
+#if UNITY_EDITOR
+                    //settings_ = Resources.Load<GamePlaySettings>("GamePlaySettings");
                     settings_ = Resources.Load<GamePlaySettings>("GamePlaySettings dev");
 #else
-                    settings_ = Resources.Load<GamePlaySettings>("GamePlaySettings");
+#if WUGOU_DEVELOPMENT
+                        settings_ = Resources.Load<GamePlaySettings>("GamePlaySettings dev");
+#else
+                        settings_ = Resources.Load<GamePlaySettings>("GamePlaySettings");
+#endif
 #endif
                     // 深拷贝
                     settings_ = Utils.DeepClone(settings_);
@@ -49,14 +57,9 @@ namespace Wugou
         public static bool isGaming { get; set; } = false;
 
         /// <summary>
-        /// 最近一局的记录
+        /// 当前使用的天气系统
         /// </summary>
-        public static GameStats lastGameStats = null;
-
-        /// <summary>
-        /// 训练记录管理
-        /// </summary>
-        public static object gameStatsManager { get; set; } = null;
+        public static IWeatherSystem weatherSystem { get; set; }
 
         public const string kGameMapPackageSuffix = ".em";
         public const string kGameMapFileSuffix = ".map";
@@ -115,10 +118,22 @@ namespace Wugou
         /// </summary>
         public static string loadedGameMapFile { get; set; } = string.Empty;
 
+        private static string _workplacePath;   // 不直接返回Application.persistentDataPath，是因为可能在其他线程中调用。。
         /// <summary>
         /// 工作区目录
         /// </summary>
-        public static string workplacePath { get; private set; }
+        public static string workplacePath 
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(_workplacePath))
+                {
+                    _workplacePath = Application.persistentDataPath;
+                }
+
+                return _workplacePath;
+            }
+        }
 
         public static string cachePath => $"{workplacePath}/cache";
 
@@ -144,6 +159,47 @@ namespace Wugou
 
         public const string kPREFS_KEY_AUTH = "PlayerAuth";
 
+        public const string kCONFIG_FILE_NAME = "config";
+
+        private static int _fps = -1;
+        /// <summary>
+        /// fps
+        /// </summary>
+        public static int fps { 
+            get
+            {
+                return _fps;
+            }
+
+            set
+            {
+                _fps = value;
+                if(_fps < 0)
+                {
+                    Application.targetFrameRate = -1;
+                    QualitySettings.vSyncCount = 1;
+                }
+                else
+                {
+                    QualitySettings.vSyncCount = 0;
+                    Application.targetFrameRate = _fps;
+                }
+            }
+        }
+
+        public static int qualityLevel
+        {
+            get
+            {
+                return QualitySettings.GetQualityLevel();
+            }
+
+            set
+            {
+                QualitySettings.SetQualityLevel(value);
+            }
+        }
+
         /// <summary>
         /// 通用内容的初始化：
         /// 1. GameEntity的Prototype注册；
@@ -152,9 +208,19 @@ namespace Wugou
         /// </summary>
         public static async void Init()
         {
-            workplacePath = Application.persistentDataPath;
-
             CreateWorkDirs();
+
+            // 读取配置文件
+            try
+            {
+                string configContent = File.ReadAllText($"{configPath}/{kCONFIG_FILE_NAME}");
+                var jo = Newtonsoft.Json.Linq.JObject.Parse(configContent);
+                fps = jo["fps"].ToObject<int>();
+            }
+            catch
+            {
+                Logger.Error("Read config error...");
+            }
 
             // register sceneObject's types
             var typePrefabs = Resources.LoadAll<GameObject>("GameEntityPrototype");
@@ -184,6 +250,26 @@ namespace Wugou
         }
 
         /// <summary>
+        /// 用于序列化配置更新
+        /// </summary>
+        public static void SaveConfigFile()
+        {
+            try
+            {
+                var file = $"{configPath}/{kCONFIG_FILE_NAME}";
+                string configContent = File.ReadAllText(file);
+                var jo = Newtonsoft.Json.Linq.JObject.Parse(configContent);
+                jo["fps"] = fps;
+
+                File.WriteAllText(file, jo.ToString());
+            }
+            catch
+            {
+                Logger.Error("Read config error...");
+            }
+        }
+
+        /// <summary>
         /// 创建必备目录
         /// </summary>
         private static void CreateWorkDirs()
@@ -207,7 +293,14 @@ namespace Wugou
 
             Directory.CreateDirectory(cachePath);
         }
+
+        public static void Release()
+        {
+            GameAssetDatabase.UnmountAll();
+        }
     }
+
+    #region Asset Parsers
 
     /// <summary>
     /// 按文件夹的方式组织
@@ -249,19 +342,23 @@ namespace Wugou
         public GameMap Parse(string path)
         {
             // 解析脚本
-            //string content = File.ReadAllText($"{path}");
-            using(FileStream fs = new FileStream(path,FileMode.Open, FileAccess.Read, FileShare.Read))
+            if (File.Exists(path))
             {
-                using (StreamReader reader = new StreamReader(fs))
+                using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
-                    string content = reader.ReadToEnd();
+                    using (StreamReader reader = new StreamReader(fs))
+                    {
+                        string content = reader.ReadToEnd();
 
-                    GameMap map = GameMap.Create();
-                    map.Parse(content);
-                    return map;
+                        GameMap map = GameMap.Create();
+                        map.Parse(content);
+                        return map;
+                    }
+
                 }
-
             }
+
+            return null;
         }
 
         public void Save(string path, GameMap map, bool overwrite = true)
@@ -281,33 +378,5 @@ namespace Wugou
         }
     }
 
-    /// <summary>
-    /// GameMapPackage解析
-    /// </summary>
-    public class GameMapPackageParser : IAssetParser<GameMapPackage>
-    {
-        public GameMapPackage Parse(string path)
-        {
-            return new GameMapPackage(path);
-        }
-
-        public void Save(string path, GameMapPackage obj, bool overwrite = true)
-        {
-            throw new System.NotImplementedException();
-        }
-    }
-
-    public class GameMapProjAssetParser : IAssetParser<GameMapProj>
-    {
-        public GameMapProj Parse(string path)
-        {
-            var proj = new GameMapProj(path);
-            return proj;
-        }
-
-        public void Save(string path, GameMapProj mapProj, bool overwrite = true)
-        {
-            mapProj.Save();
-        }
-    }
+    #endregion
 }

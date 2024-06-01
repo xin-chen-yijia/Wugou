@@ -20,7 +20,7 @@ namespace Wugou
 		[SerializeField] float m_GroundCheckDistance = 0.1f;
 
 		Rigidbody m_Rigidbody;
-		Animator m_Animator;
+		public Animator animator;
 		bool m_IsGrounded;
 
 		public float GroundedOffset = -0.14f;
@@ -35,14 +35,12 @@ namespace Wugou
 		CapsuleCollider m_Capsule;
 		bool m_Crouching;
 
-		public Animator animator { get { return m_Animator; } set { m_Animator = value; } }
-
 		void Awake()
 		{
 
-            if (m_Animator == null)
+            if (animator == null)
 			{
-				m_Animator = GetComponent<Animator>();
+				animator = GetComponent<Animator>();
 			}
 			m_Rigidbody = GetComponent<Rigidbody>();
 			m_Capsule = GetComponent<CapsuleCollider>();
@@ -52,14 +50,14 @@ namespace Wugou
 			m_Rigidbody.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY | RigidbodyConstraints.FreezeRotationZ;
 			m_OrigGroundCheckDistance = m_GroundCheckDistance;
 
-		}
+        }
 
-		public void Move(Vector3 move, bool crouch, bool jump)
+        public void Move(Vector3 move, bool crouch, bool jump)
 		{
             // fixed me:
             if (m_IsGrounded)
             {
-                Vector3 v = new Vector3(move.x, 0, move.z) * Time.deltaTime * 150;
+                Vector3 v = new Vector3(move.x, 0, move.z) * Time.fixedDeltaTime * 150;
 
                 // we preserve the existing y part of the current velocity.
                 v.y = m_Rigidbody.velocity.y;
@@ -93,8 +91,6 @@ namespace Wugou
 
 			// send input and other state parameters to the animator
 			UpdateAnimator(move);
-
-
 		}
 
 
@@ -140,13 +136,13 @@ namespace Wugou
 		void UpdateAnimator(Vector3 move)
 		{
 			// update the animator parameters
-			m_Animator.SetFloat("Forward", m_ForwardAmount, 0.1f, Time.deltaTime);
-			m_Animator.SetFloat("Turn", m_TurnAmount, 0.1f, Time.deltaTime);
-			m_Animator.SetBool("Crouch", m_Crouching);
-			m_Animator.SetBool("OnGround", m_IsGrounded);
+			animator.SetFloat("Forward", m_ForwardAmount, 0.1f, Time.fixedDeltaTime);
+			animator.SetFloat("Turn", m_TurnAmount, 0.1f, Time.fixedDeltaTime);
+			animator.SetBool("Crouch", m_Crouching);
+			animator.SetBool("OnGround", m_IsGrounded);
 			if (!m_IsGrounded)
 			{
-				m_Animator.SetFloat("Jump", m_Rigidbody.velocity.y);
+				animator.SetFloat("Jump", m_Rigidbody.velocity.y);
 			}
 
 			// calculate which leg is behind, so as to leave that leg trailing in the jump animation
@@ -154,23 +150,23 @@ namespace Wugou
 			// and assumes one leg passes the other at the normalized clip times of 0.0 and 0.5)
 			float runCycle =
 				Mathf.Repeat(
-					m_Animator.GetCurrentAnimatorStateInfo(0).normalizedTime + m_RunCycleLegOffset, 1);
+					animator.GetCurrentAnimatorStateInfo(0).normalizedTime + m_RunCycleLegOffset, 1);
 			float jumpLeg = (runCycle < k_Half ? 1 : -1) * m_ForwardAmount;
 			if (m_IsGrounded)
 			{
-				m_Animator.SetFloat("JumpLeg", jumpLeg);
+				animator.SetFloat("JumpLeg", jumpLeg);
 			}
 
 			// the anim speed multiplier allows the overall speed of walking/running to be tweaked in the inspector,
 			// which affects the movement speed because of the root motion.
 			if (m_IsGrounded && move.magnitude > 0)
 			{
-				m_Animator.speed = m_AnimSpeedMultiplier;
+				animator.speed = m_AnimSpeedMultiplier;
 			}
 			else
 			{
 				// don't use that while airborne
-				m_Animator.speed = 1;
+				animator.speed = 1;
 			}
 		}
 
@@ -188,13 +184,13 @@ namespace Wugou
 		void HandleGroundedMovement(bool crouch, bool jump)
 		{
 			// check whether conditions are right to allow a jump:
-			if (jump && !crouch && m_Animator.GetCurrentAnimatorStateInfo(0).IsName("Grounded"))
+			if (jump && !crouch && animator.GetCurrentAnimatorStateInfo(0).IsName("Grounded"))
 			{
 				// jump!
 				m_Rigidbody.velocity = new Vector3(m_Rigidbody.velocity.x, m_JumpPower, m_Rigidbody.velocity.z);
 				m_IsGrounded = false;
-				m_Animator.applyRootMotion = false;
-				m_GroundCheckDistance = 0.1f;
+				animator.applyRootMotion = false;
+				//m_GroundCheckDistance = 0.1f;
 			}
 		}
 
@@ -202,7 +198,7 @@ namespace Wugou
 		{
 			// help the character turn faster (this is in addition to root rotation in the animation)
 			float turnSpeed = Mathf.Lerp(m_StationaryTurnSpeed, m_MovingTurnSpeed, m_ForwardAmount);
-			transform.Rotate(0, m_TurnAmount * turnSpeed * Time.deltaTime, 0);
+			transform.Rotate(0, m_TurnAmount * turnSpeed * Time.fixedDeltaTime, 0);
 		}
 
 
@@ -210,9 +206,9 @@ namespace Wugou
 		//{
 		//	// we implement this function to override the default root motion.
 		//	// this allows us to modify the positional speed before it's applied.
-		//	if (m_IsGrounded && Time.deltaTime > 0)
+		//	if (m_IsGrounded && deltaTime_ > 0)
 		//	{
-		//		Vector3 v = (m_Animator.deltaPosition * m_MoveSpeedMultiplier) / Time.deltaTime;
+		//		Vector3 v = (m_Animator.deltaPosition * m_MoveSpeedMultiplier) / deltaTime_;
 
 		//		// we preserve the existing y part of the current velocity.
 		//		v.y = m_Rigidbody.velocity.y;

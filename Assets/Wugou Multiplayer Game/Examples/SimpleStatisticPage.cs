@@ -50,7 +50,7 @@ namespace Wugou.Examples.UI
             GameObject lastCheck = null;
             Utils.FillContent(rowContainer, rowPrefab, records, (item, stats) =>
             {
-                var statsManager = Gameplay.gameStatsManager as FileAssetsManager<SimpleGameStats>;
+                var statsManager = SimpleNonGamingSystem.gameStatsManager;
                 var record = statsManager.Get($"{stats.name}");
                 item.transform.Find("Name").GetComponent<TMP_Text>().text = record.name;
                 item.transform.Find("Script").GetComponent<TMP_Text>().text = record.gamemap;
@@ -101,7 +101,7 @@ namespace Wugou.Examples.UI
         {
             base.Show(asTop);
 
-            var statsManager = Gameplay.gameStatsManager as FileAssetsManager<SimpleGameStats>;
+            var statsManager = SimpleNonGamingSystem.gameStatsManager;
             SetTrainingRecord(statsManager.GetAll());
             listPage.SetActive(true);
             detailPage.SetActive(false);

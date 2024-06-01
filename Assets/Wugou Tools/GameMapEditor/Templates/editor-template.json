@@ -4,8 +4,9 @@
         "items": [
             {
                 "name": "StartPosition",
-                "asset": "StartPosition",
-                "type": "StartPosition"
+                "prototype": "GameObject",
+                "asset": "/xxx/StartPos",
+                "icon": "images/StartPos.png"
             }
         ]
     }

@@ -58,9 +58,17 @@ namespace Wugou.UI
                 return null;
             }
 
-            if (pages_.ContainsKey(type) && pages_[type] != null)
+            if (pages_.ContainsKey(type))
             {
-                return pages_[type];
+                if(pages_[type] != null)
+                {
+                    return pages_[type];
+                }
+                else
+                {
+                    Logger.Error($"{type} is null, maybe destroyed...");
+                    pages_.Remove(type);
+                }
             }
 
             var page = additionalWindow.GetComponentInChildren(type, true) as UIBaseWindow;
@@ -100,6 +108,20 @@ namespace Wugou.UI
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// 删除UI
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        public static void DeleteWindow<T>() where T : UIBaseWindow
+        {
+            var type = typeof(T);
+            if (pages_.ContainsKey(type))
+            {
+                GameObject.Destroy(pages_[type]);
+                pages_.Remove(type);
+            }
         }
 
         public static void Release()

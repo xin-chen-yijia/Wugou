@@ -120,11 +120,11 @@ namespace cakeslice
 
 		private void Awake()
 		{
-			if (Instance != null)
-			{
-				Destroy(this);
-				throw new System.Exception("you can only have one outline camera in the scene");
-			}
+			//if (Instance != null)
+			//{
+			//	Destroy(this);
+			//	throw new System.Exception("you can only have one outline camera in the scene");
+			//}
 
 			Instance = this;
 		}
@@ -307,19 +307,25 @@ namespace cakeslice
 			{
 				foreach (Outline oL in o)
 				{
-					if (!outlines.Contains(oL))
+					if (oL.enabled && !outlines.Contains(oL))
 						outlines.Add(oL);
 				}
 			}
 		}
 
-		void OnDestroy()
+		public void OnDestroy()
 		{
 			if (renderTexture != null)
 				renderTexture.Release();
 			if (extraRenderTexture != null)
 				extraRenderTexture.Release();
 			DestroyMaterials();
+
+			if (outlineCamera)
+			{
+				GameObject.Destroy(outlineCamera.gameObject);
+                outlineCamera = null;
+            }
 		}
 
 		[ImageEffectOpaque]

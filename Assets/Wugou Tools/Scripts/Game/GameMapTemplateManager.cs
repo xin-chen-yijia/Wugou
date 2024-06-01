@@ -7,7 +7,21 @@ using System.IO;
 namespace Wugou
 {
     /// <summary>
-    /// 
+    /// 模板描述
+    /// </summary>
+    public class GameMapTemplateDesc
+    {
+        public string name;
+        public string sceneType;
+
+        public bool needWeather;
+        public WeatherDesc weather;
+
+        public string gameScript;
+    }
+
+    /// <summary>
+    /// 游戏脚本模板管理
     /// </summary>
     public static class GameMapTemplateManager
     {
@@ -18,8 +32,31 @@ namespace Wugou
         /// <returns></returns>
         public static List<GameMapTemplateDesc> GetAllGameMapTemplates()
         {
-            var res = JsonConvert.DeserializeObject<List<GameMapTemplateDesc>>(File.ReadAllText($"{Gameplay.configPath}/map-templates.json"));
-            return res;
+            return new List<GameMapTemplateDesc>()
+            {
+                new GameMapTemplateDesc
+                {
+                    name = "多角色模拟演练",
+                    sceneType = "3D",
+                    needWeather = true,
+                    weather = new WeatherDesc
+                    {
+                        type=1,
+                        time = 0.4f,
+                        fogDensity = 0.5f,
+                        windForce = 0,
+                        windDir = 0,
+                    },
+                    gameScript = "MultplayerTraining"
+                },
+                new GameMapTemplateDesc
+                {
+                    name = "Gis",
+                    sceneType = "Gis",
+                    needWeather = false,
+                },
+            };
+
         }
 
         /// <summary>
@@ -32,12 +69,21 @@ namespace Wugou
             GameMap map = GameMap.Create();
             if (template != null)
             {
-                map.Parse(template.content);
+                map.needWeather = template.needWeather;
+                map.weather = template.weather;
+                map.gameScript = template.gameScript;
             }
             else
             {
-                map.Parse("{}");    // 空白模板
-                map.weather.time = 0.4f;
+                map.needWeather = true;
+                map.weather = new WeatherDesc
+                {
+                    type = 1,
+                    time = 0.4f,
+                    fogDensity = 0.5f,
+                    windForce = 0,
+                    windDir = 0,
+                };
             }
 
             map.version = GameMap.kLatestVersion;
@@ -48,24 +94,6 @@ namespace Wugou
         }
     }
 
-    /// <summary>
-    /// 模板描述
-    /// </summary>
-    public class GameMapTemplateDesc
-    {
-        public string name;
-        public string sceneType;
-        public string icon;
 
-        /// <summary>
-        /// 可选场景
-        /// </summary>
-        public List<string> sceneTags { get; set; }
-
-        /// <summary>
-        /// 地图内容
-        /// </summary>
-        public string content { get; set; }
-    }
 
 }

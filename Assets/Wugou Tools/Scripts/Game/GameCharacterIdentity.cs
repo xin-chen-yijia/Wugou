@@ -7,9 +7,9 @@ namespace Wugou.Multiplayer
     public class GameCharacterIdentity : GameComponent
     {
         [SerializeField]
-        public string roleName;
+        public string characterName;
         [SerializeField]
-        public string roleClass;
+        public string characterClass;
 
         //// Start is called before the first frame update
         //void Start()

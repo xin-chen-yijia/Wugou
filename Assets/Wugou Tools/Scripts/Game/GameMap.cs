@@ -18,7 +18,7 @@ namespace Wugou
         /// <summary>
         /// 当前版本，用于比对
         /// </summary>
-        public const int kLatestVersion = 1;
+        public const int kLatestVersion = 2;
 
         public long timestamp;     // 时间戳
 
@@ -30,6 +30,7 @@ namespace Wugou
         public string createTime;   //时间
         public string description;  //简介
 
+        public string sceneName;    // 场景的名称，用于显示
         public string scene;    // 场景
 
         // entity的数量
@@ -37,6 +38,9 @@ namespace Wugou
 
         // 最大玩家数量 
         public int maxPlayerCount;
+
+        // 游戏脚本
+        public string gameScript;
 
         // 是否模拟天气
         public bool needWeather;
@@ -72,15 +76,19 @@ namespace Wugou
 
             GameMapReader reader = new GameMapReader(content);
             version = reader.Read<int>("version",null, -1);
-            timestamp = reader.Read<long>("version",null, -1);
+            timestamp = reader.Read<long>("timestamp", null, -1);
             name = reader.Read("name");
             author = reader.Read("author");
             createTime = reader.Read("createTime");
             description = reader.Read("description");
 
             scene = reader.Read("gameworld/scene");
+            sceneName = reader.Read("gameworld/sceneName");
 
             maxPlayerCount = reader.Read<int>("maxPlayerCount");
+
+            //
+            gameScript = reader.Read<string>("gameworld/gameScript");
 
             //
             needWeather = reader.Read<bool>("gameworld/needWeather");
@@ -256,11 +264,14 @@ namespace Wugou
             JObject gameWorldJo = new JObject();
             // scene
             gameWorldJo.Add("scene", JToken.FromObject(map.scene));
+            gameWorldJo.Add("sceneName", JToken.FromObject(map.sceneName));
             // 写入gameentity
-            gameWorldJo.Add("entities", JArray.FromObject(GameWorld.gameEntities, JsonSerializerGlobal.commonSerializer));
+            gameWorldJo.Add("entities", JArray.FromObject(GameWorld.gameEntities.FindAll((entity) => { return entity.needSerialize; }), JsonSerializerGlobal.commonSerializer));
+            // gamescripts
+            gameWorldJo.Add("gameScript", JToken.FromObject(map.gameScript ?? ""));
             // 写入天气
             gameWorldJo.Add("needWeather", map.needWeather);
-            gameWorldJo.Add("weather", JToken.FromObject(WeatherSystem.activeWeather));
+            gameWorldJo.Add("weather", JToken.FromObject(map.weather));
 
             jo.Add("gameworld", gameWorldJo);
             jo.Add("author", map.author);

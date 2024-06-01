@@ -13,7 +13,7 @@ namespace Wugou
         public float MaximumX = 90F;
         public bool smooth;
         public float smoothTime = 5f;
-        public bool lockCursor = true;
+        public bool lockCursor { get; private set; } = true;
 
 
         private Quaternion m_CharacterTargetRot;
@@ -29,8 +29,8 @@ namespace Wugou
 
         public void LookRotation(Transform character, Transform camera)
         {
-            float yRot = Input.GetAxis("Mouse X") * XSensitivity;
-            float xRot = Input.GetAxis("Mouse Y") * YSensitivity;
+            float yRot = Input.GetMouseButton(1) ? Input.GetAxis("Mouse X") * XSensitivity : 0;
+            float xRot = Input.GetMouseButton(1) ? Input.GetAxis("Mouse Y") * YSensitivity : 0;
 
             m_CharacterTargetRot *= Quaternion.Euler(0f, yRot, 0f);
             m_CameraTargetRot *= Quaternion.Euler(-xRot, 0f, 0f);
@@ -64,7 +64,7 @@ namespace Wugou
             }
         }
 
-        public void UpdateCursorLock()
+        private void UpdateCursorLock()
         {
             //if the user set "lockCursor" we check & properly lock the cursos
             if (lockCursor)

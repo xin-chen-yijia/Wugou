@@ -26,10 +26,14 @@ namespace Wugou
                 {
                     ZipPacker packer = new ZipPacker();
                     var content = packer.Read(path, $"{name}/{name}{Gameplay.kGameMapFileSuffix}");
-                    string text = System.Text.Encoding.UTF8.GetString(content);
+                    if (content != null)
+                    {
+                        string text = System.Text.Encoding.UTF8.GetString(content);
 
-                    gameMap_ = GameMap.Create();
-                    gameMap_.Parse(text);
+                        gameMap_ = GameMap.Create();
+                        gameMap_.Parse(text);
+                    }
+
                 }
 
                 return gameMap_;
@@ -95,7 +99,7 @@ namespace Wugou
                 return;
             }
 
-            // 有缓存就不解压了
+            // 根据缓存判断是否需要解压
             var packer = new ZipPacker();
             var root = packer.GetRootDirectory(path);
             var packageDir = $"{dst}/{root}";
@@ -121,7 +125,15 @@ namespace Wugou
             {
                 if (Directory.Exists(packageDir))
                 {
-                    Directory.Delete(packageDir, true);    // 删除
+                    try
+                    {
+                        Directory.Delete(packageDir, true);    // 删除
+                    }
+                    catch(System.Exception e)
+                    {
+                        Logger.Error($"删除目录：{packageDir} 失败。{e.Message}");
+                    }
+
                 }
                 if(!packer.UnZip(path, dst))
                 {
@@ -129,10 +141,34 @@ namespace Wugou
                 }
                 else
                 {
-                    File.WriteAllText(cacheFile, lastModified.ToString());
+                    try
+                    {
+                        // 可能多个进程写，主要是测试环境下
+                        File.WriteAllText(cacheFile, lastModified.ToString());
+                    }
+                    catch (System.Exception e)
+                    {
+                        Logger.Error($"写入：{cacheFile} 失败。{e.Message}");
+                    }
                 }
             }
 
+        }
+    }
+
+    /// <summary>
+    /// GameMapPackage解析
+    /// </summary>
+    public class GameMapPackageParser : IAssetParser<GameMapPackage>
+    {
+        public GameMapPackage Parse(string path)
+        {
+            return new GameMapPackage(path);
+        }
+
+        public void Save(string path, GameMapPackage obj, bool overwrite = true)
+        {
+            throw new System.NotImplementedException();
         }
     }
 }

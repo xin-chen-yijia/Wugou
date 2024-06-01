@@ -9,14 +9,18 @@ namespace Wugou
     /// </summary>
     public abstract class Equip : MonoBehaviour
     {
-        protected GameObject player_;
+        public GameObject player { get; private set; }
+
         /// <summary>
-        /// 持有该装备时选择物体的处理
+        /// 当被添加到玩家的背包中时调用
         /// </summary>
-        /// <param name="entity"></param>
-        public virtual void OnSelectEntity(GameEntity entity)
+        public virtual void OnAddToPackage(GameObject player)
         {
-            
+            this.player = player;
+
+            transform.SetParent(player.transform);
+            transform.position = Vector3.zero;
+            transform.rotation = Quaternion.identity;
         }
 
         /// <summary>
@@ -24,7 +28,7 @@ namespace Wugou
         /// </summary>
         public virtual bool PickUp(GameObject player)
         {
-            player_ = player;
+            gameObject.SetActive(true);
             return true;
         }
 
@@ -38,6 +42,7 @@ namespace Wugou
                 Wugou.Logger.Warning("Equip is running while it be drop...");
             }
 
+            gameObject.SetActive(false);
             return true;
         }
 
