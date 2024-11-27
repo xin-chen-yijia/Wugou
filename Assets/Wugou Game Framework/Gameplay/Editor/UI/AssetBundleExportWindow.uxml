@@ -1,0 +1,28 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <ui:Image style="width: 100%; height: 2px background-color red; -unity-background-image-tint-color: rgb(255, 0, 0);" />
+    <ui:Label text="AssetBundle Export" display-tooltip-when-elided="true" style="font-size: 22px; -unity-font-style: bold;" />
+    <ui:VisualElement name="Main" style="height: 960px; max-width: 100%; max-height: 1200px; min-width: 100%; min-height: 600px;">
+        <ui:VisualElement name="ExportGroup" style="height: auto; width: auto; max-height: 90%; min-height: 10px;">
+            <ui:GroupBox name="OutputGroup" style="flex-direction: row; margin-left: 0; margin-right: 0; margin-top: 0; margin-bottom: 0;">
+                <ui:TextField picking-mode="Ignore" label="Output:" value="&lt;path to export&gt;" name="ExportPath" usage-hints="DynamicColor" style="width: 629px; justify-content: flex-start; align-items: stretch; height: 20px; -unity-text-align: middle-left; margin-left: 0; margin-right: 0; margin-top: 0; margin-bottom: 0;" />
+                <ui:Button text="Browser..." display-tooltip-when-elided="true" name="BrowserBtn" style="flex-grow: 0; width: 73px; right: auto; position: relative; flex-direction: row;" />
+            </ui:GroupBox>
+            <ui:DropdownField label="Build Options" index="-1" choices="System.Collections.Generic.List`1[System.String]" name="BuildOptions" style="margin-right: 10px;" />
+            <ui:DropdownField label="Build Target" index="-1" choices="System.Collections.Generic.List`1[System.String]" name="BuildTarget" style="margin-right: 10px;" />
+            <ui:VisualElement name="Encrypt" style="flex-grow: 1;">
+                <ui:Toggle label="Encrypt" name="EncryptToggle" value="true" style="height: 30px; -unity-text-align: middle-left;" />
+            </ui:VisualElement>
+            <ui:VisualElement name="Zip" style="flex-grow: 1;">
+                <ui:Toggle label="Zip" name="ZipToggle" value="true" style="height: 30px; -unity-text-align: middle-left;" />
+            </ui:VisualElement>
+            <ui:VisualElement name="ExportScrollView" style="max-height: 90%; min-height: 30%; height: 90%; margin-top: 20px;" />
+        </ui:VisualElement>
+        <ui:VisualElement name="OptButtons" style="flex-direction: row; align-items: flex-end; justify-content: center; position: absolute; bottom: 20px; width: 100%; height: 50px; right: auto; top: auto; left: auto; margin-top: 0;">
+            <ui:VisualElement style="flex-direction: row; flex-wrap: wrap; justify-content: space-around; width: 100%; height: 100%; align-items: center;">
+                <ui:Button text="Build AssetBundle" display-tooltip-when-elided="true" name="BuildBtn" style="width: 200px; height: 30px;" />
+                <ui:Button text="Reset AssetBundle Name" display-tooltip-when-elided="true" name="ResetBtn" style="width: 200px; height: 30px;" />
+                <ui:Button text="Clear Old Output" display-tooltip-when-elided="true" name="ClearOldBtn" style="width: 200px; height: 30px;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

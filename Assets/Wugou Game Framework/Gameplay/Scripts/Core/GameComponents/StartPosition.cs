@@ -1,0 +1,43 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace Wugou
+{
+    public class StartPosition : GameComponent
+    {
+        public int id { get;private set; }
+
+        private static Dictionary<int,StartPosition> allPositions = new Dictionary<int,StartPosition>();
+        public static int positionCount => allPositions.Count;
+
+        public static Transform positionAt(int id) => (id >= 0 && id<allPositions.Count) ? allPositions[id].transform : null;
+        
+
+        private void Awake()
+        {
+            if(GameConsole.isGaming)
+            {
+                id = allPositions.Count;
+                allPositions.Add(id, this);
+            }
+        }
+
+        private void Start()
+        {
+            if (GameConsole.isGaming)
+            {
+                // hide on game
+                gameObject.SetActive(false);
+            }
+
+        }
+
+        public void OnDestroy()
+        {
+            // 注意清除，否则会记录到下一个场景。。。
+            allPositions.Remove(id);
+        }
+    }
+}
+

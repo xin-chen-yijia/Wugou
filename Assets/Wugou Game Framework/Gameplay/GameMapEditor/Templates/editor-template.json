@@ -1,0 +1,19 @@
+{
+    "name": "社会角色",
+    "order": 300,
+    "icon": "/BuiltIn/editor/characters/应急人员.png",
+    "items": [
+        {
+            "name": "男孩1",
+            "asset": "/EmgProps/Boy_1.prefab",
+            "type": "InjuredMan",
+            "icon": "/BuiltIn/editor/characters/images/Boy_1.png"
+        },
+        {
+            "name": "男孩2",
+            "asset": "/EmgProps/Boy_2.prefab",
+            "type": "InjuredMan",
+            "icon": "/BuiltIn/editor/characters/images/Boy_2.png"
+        }
+    ]
+}

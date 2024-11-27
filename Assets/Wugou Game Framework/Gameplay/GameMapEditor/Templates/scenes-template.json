@@ -1,0 +1,9 @@
+{
+    "name": "Gis",
+    "type": "Gis",
+    "scene": "/BuiltIn/Gis",
+    "useFlyCamera": false,
+    "tags": [ "地铁", "车站", "火灾", "洪涝", "地震", "公共卫生事件" ],
+    "thumbnail": "/BuiltIn/scenes/BuiltIn-gis/Earth.jpg",
+    "description": "中等地形，适合10-20人协同训练。"
+  }
